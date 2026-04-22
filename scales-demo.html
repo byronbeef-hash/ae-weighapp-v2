@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>AgriEID — Cattle Scales Demo</title>
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+    --bg-primary: #0d1117;
+    --bg-secondary: #161b22;
+    --bg-card: #161b22;
+    --text-primary: #ffffff;
+    --text-secondary: rgba(255, 255, 255, 0.55);
+    --text-dim: rgba(255, 255, 255, 0.25);
+    --green: #3fb950;
+    --green-dim: rgba(63, 185, 80, 0.15);
+    --red: #f85149;
+    --orange: #f0883e;
+    --blue: #58a6ff;
+    --border: rgba(255, 255, 255, 0.15);
+    --glass-bg: #161b22;
+    --glass-border: rgba(255, 255, 255, 0.18);
+    --glass-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --radius: 12px;
+    --radius-sm: 8px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+    min-height: 100vh;
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    overflow-x: hidden;
+}
+
+/* === Progress Bar === */
+.demo-progress { position: fixed; top: 0; left: 0; height: 3px; z-index: 100; background: var(--green); transition: width 0.4s ease; }
+
+/* === Step Label === */
+.demo-step-label {
+    position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 99;
+    font-size: 12px; font-weight: 600; color: var(--text-secondary);
+    background: var(--bg-secondary); border: 1px solid var(--glass-border);
+    padding: 4px 16px; border-radius: 20px; transition: opacity 0.3s;
+}
+
+/* === Steps === */
+.demo-step {
+    display: none; min-height: calc(100vh - 70px); padding: 60px 20px 90px;
+    max-width: 900px; margin: 0 auto; animation: fadeIn 0.4s ease;
+}
+.demo-step.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+/* === Bottom Nav === */
+.demo-nav {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+    background: var(--bg-secondary); border-top: 1px solid var(--border);
+    padding: 12px 20px; display: flex; align-items: center; justify-content: space-between;
+}
+.demo-nav-dots { display: flex; gap: 8px; }
+.demo-nav-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-dim); transition: all 0.3s; cursor: pointer; }
+.demo-nav-dot.active { background: var(--green); transform: scale(1.3); }
+.demo-nav-dot.visited { background: var(--text-secondary); }
+.demo-btn {
+    padding: 10px 24px; border-radius: var(--radius); border: 1px solid var(--glass-border);
+    background: var(--glass-bg); color: var(--text-primary); font-family: 'Inter', sans-serif;
+    font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; min-width: 80px; text-align: center;
+}
+.demo-btn:hover { background: #1c2129; }
+.demo-btn.primary { background: var(--green); color: #000; border-color: var(--green); }
+.demo-btn.primary:hover { background: #4cce5b; }
+.demo-btn.hidden { visibility: hidden; }
+.demo-btn.flash { animation: btnFlash 1s ease infinite; }
+@keyframes btnFlash { 0%,100% { box-shadow: 0 0 0 0 rgba(63,185,80,0.4); } 50% { box-shadow: 0 0 16px 4px rgba(63,185,80,0.6); } }
+
+/* === Components === */
+.demo-card { background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; box-shadow: var(--glass-shadow); }
+.demo-badge { display: inline-block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; padding: 4px 12px; border-radius: 20px; background: var(--glass-bg); color: var(--text-secondary); border: 1px solid var(--glass-border); }
+.demo-badge.green { background: var(--green-dim); color: var(--green); border-color: rgba(63,185,80,0.3); }
+.demo-badge.orange { background: rgba(240,136,62,0.15); color: var(--orange); border-color: rgba(240,136,62,0.3); }
+.demo-tooltip { background: var(--bg-secondary); border: 1px solid var(--green); border-radius: var(--radius); padding: 14px 18px; margin-top: 16px; font-size: 14px; color: var(--text-secondary); line-height: 1.5; border-left: 3px solid var(--green); }
+.demo-tooltip strong { color: var(--green); }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: var(--text-dim); margin-right: 6px; }
+.status-dot.connected { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.demo-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.demo-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+@media (max-width: 600px) { .demo-grid-2, .demo-grid-3 { grid-template-columns: 1fr 1fr; } .demo-step { padding: 50px 16px 90px; } }
+.demo-toast { position: fixed; top: 50px; left: 50%; transform: translateX(-50%); background: var(--green); color: #000; padding: 10px 24px; border-radius: var(--radius); font-size: 14px; font-weight: 600; z-index: 200; opacity: 0; transition: opacity 0.3s; box-shadow: 0 4px 20px rgba(63,185,80,0.4); }
+.demo-toast.show { opacity: 1; }
+.section-title { font-size: 16px; font-weight: 700; margin-bottom: 12px; }
+.section-title small { font-weight: 400; color: var(--text-secondary); font-size: 13px; }
+
+/* === Welcome === */
+.welcome-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: calc(100vh - 160px); text-align: center; }
+.welcome-logo { font-family: 'Orbitron', monospace; font-size: 48px; font-weight: 900; color: var(--green); margin-bottom: 12px; text-shadow: 0 0 30px rgba(63,185,80,0.3); }
+.welcome-tagline { font-size: 22px; color: var(--text-secondary); margin-bottom: 8px; }
+.welcome-sub { font-size: 14px; color: var(--text-dim); margin-bottom: 40px; max-width: 420px; }
+.welcome-cta { padding: 18px 48px; border-radius: var(--radius); border: none; background: var(--green); color: #000; font-family: 'Inter', sans-serif; font-size: 18px; font-weight: 700; cursor: pointer; transition: all 0.2s; box-shadow: 0 0 20px rgba(63,185,80,0.3); }
+.welcome-cta:hover { background: #4cce5b; box-shadow: 0 0 30px rgba(63,185,80,0.5); }
+.welcome-duration { font-size: 12px; color: var(--text-dim); margin-top: 16px; }
+@media (max-width: 600px) { .welcome-logo { font-size: 36px; } .welcome-tagline { font-size: 18px; } }
+
+/* === Weight Display === */
+.weight-indicator { background: #0d1117; border: 2px solid var(--glass-border); border-radius: 20px; padding: 40px 20px; margin-bottom: 16px; text-align: center; transition: border-color 0.3s, box-shadow 0.3s; }
+.weight-indicator.steady { border-color: rgba(63,185,80,0.5); box-shadow: 0 0 20px rgba(63,185,80,0.15); }
+.weight-indicator.dynamic { border-color: rgba(240,136,62,0.5); box-shadow: 0 0 20px rgba(240,136,62,0.15); }
+.weight-value { font-family: 'Orbitron', monospace; font-size: 80px; font-weight: 900; color: var(--green); line-height: 1; padding: 20px 0; display: flex; align-items: center; justify-content: center; transition: color 0.3s; }
+.weight-value.dynamic { color: var(--orange); }
+.weight-value .unit { font-size: 32px; font-weight: 400; margin-left: 8px; opacity: 0.7; }
+@media (min-width: 600px) { .weight-value { font-size: 110px; } .weight-value .unit { font-size: 40px; } }
+@media (min-width: 1024px) { .weight-value { font-size: 130px; padding: 48px 0; } .weight-value .unit { font-size: 48px; } }
+.badge-row { display: flex; justify-content: center; gap: 12px; margin-top: 8px; }
+.demo-lock-btn { width: 100%; padding: 16px; border-radius: var(--radius); border: 1px solid var(--green); background: var(--green-dim); color: var(--green); font-family: 'Inter', sans-serif; font-size: 16px; font-weight: 600; cursor: default; transition: all 0.3s; }
+.demo-lock-btn.locked { background: var(--green); color: #000; }
+.locked-display { background: rgba(63,185,80,0.08); border: 1px solid rgba(63,185,80,0.3); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; text-align: center; display: none; }
+.locked-display.visible { display: block; animation: flashGreen 0.6s ease; }
+.locked-label { font-size: 12px; font-weight: 600; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 1px; }
+.locked-val { font-family: 'Orbitron', monospace; font-size: 32px; font-weight: 700; color: var(--green); }
+@keyframes flashGreen { 0%,100% { box-shadow: none; } 50% { box-shadow: 0 0 20px rgba(63,185,80,0.4); } }
+
+/* === Stats === */
+.stat-card { background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius); padding: 16px; text-align: center; }
+.stat-number { font-family: 'Orbitron', monospace; font-size: 28px; font-weight: 700; color: var(--green); }
+.stat-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--text-secondary); margin-top: 4px; }
+
+/* === Records list === */
+.record-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); margin-bottom: 8px; font-size: 13px; }
+.rec-num { font-family: 'Orbitron', monospace; font-size: 11px; color: var(--text-dim); width: 28px; }
+.rec-weight { font-family: 'Orbitron', monospace; font-weight: 700; color: var(--green); }
+.rec-time { font-size: 12px; color: var(--text-dim); }
+.rec-vid { font-weight: 600; color: var(--orange); }
+
+/* === Chart === */
+.chart-svg { width: 100%; height: 220px; }
+.chart-line { fill: none; stroke: var(--green); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.chart-area { fill: var(--green-dim); opacity: 0.5; }
+.chart-dot { fill: var(--green); }
+.chart-grid { stroke: var(--border); stroke-width: 0.5; }
+.chart-label { fill: var(--text-dim); font-size: 11px; font-family: 'Inter', sans-serif; }
+
+/* === CTA === */
+.feature-card { background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius); padding: 20px; text-align: center; }
+.feature-icon { font-size: 28px; margin-bottom: 8px; }
+.feature-title { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+.feature-desc { font-size: 12px; color: var(--text-secondary); }
+.cta-main { display: block; width: 100%; max-width: 400px; margin: 32px auto 12px; padding: 18px; border-radius: var(--radius); border: none; background: var(--green); color: #000; font-family: 'Inter', sans-serif; font-size: 18px; font-weight: 700; cursor: pointer; text-decoration: none; text-align: center; box-shadow: 0 0 20px rgba(63,185,80,0.3); transition: all 0.2s; }
+.cta-main:hover { background: #4cce5b; }
+.cta-secondary { display: block; text-align: center; color: var(--text-secondary); font-size: 14px; margin-top: 8px; }
+.cta-note { text-align: center; font-size: 12px; color: var(--text-dim); margin-top: 24px; max-width: 400px; margin-left: auto; margin-right: auto; }
+
+/* === Record badge === */
+.record-badge { display: inline-flex; align-items: center; gap: 4px; background: var(--green-dim); border: 1px solid rgba(63,185,80,0.3); border-radius: 20px; padding: 4px 12px; }
+.record-badge-num { font-family: 'Orbitron', monospace; font-size: 18px; font-weight: 700; color: var(--green); }
+.record-badge-label { font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; }
+</style>
+</head>
+<body>
+
+<div class="demo-progress" id="progress-bar" style="width:0%"></div>
+<div class="demo-step-label" id="step-label"></div>
+<div class="demo-toast" id="toast"></div>
+
+<!-- ==================== STEP 1: APP SETUP SCREEN ==================== -->
+<div class="demo-step active" id="step-1">
+    <div style="font-weight:700; font-size:20px; margin-bottom:16px;">AgriEID</div>
+
+    <div class="setup-btns">
+        <div class="setup-btn green">+ New Session</div>
+        <div class="setup-btn">Historic Sessions</div>
+        <div class="setup-btn">Cloud Data</div>
+        <div class="setup-btn">Cloud Login</div>
+    </div>
+
+    <div class="demo-grid-2">
+        <div class="demo-card">
+            <div style="font-weight:700; margin-bottom:4px;"><span class="status-dot" id="scales-dot"></span> Weigh Scales</div>
+            <div style="font-size:13px; color:var(--text-secondary); margin-bottom:12px;">Connect to your AGU9i indicator via Bluetooth</div>
+            <div id="scales-btn" style="padding:14px; text-align:center; border-radius:var(--radius); border:1px solid var(--glass-border); background:var(--glass-bg); font-weight:600;">Connect Scales</div>
+        </div>
+        <div class="demo-card">
+            <div style="font-weight:700; margin-bottom:4px;"><span class="status-dot" id="reader-dot"></span> EID Reader</div>
+            <div style="font-size:13px; color:var(--text-secondary); margin-bottom:12px;">Connect via Bluetooth</div>
+            <div id="reader-btn" style="padding:14px; text-align:center; border-radius:var(--radius); border:1px solid var(--glass-border); background:var(--glass-bg); font-weight:600;">Connect Reader</div>
+            <div style="font-size:12px; margin-top:8px; padding:6px 10px; background:var(--green-dim); border-radius:var(--radius-sm);"><strong style="color:var(--green);">First time?</strong> <span style="color:var(--text-secondary);">If asked for a pairing code, enter <strong>0000</strong> or ignore</span></div>
+        </div>
+    </div>
+
+    <div class="demo-grid-2" style="margin-top:4px;">
+        <div class="demo-card">
+            <div style="font-weight:700; margin-bottom:8px;">Display Mode</div>
+            <div style="font-size:13px; margin-bottom:4px;"><span style="color:var(--green);">&#9679;</span> <strong>EID + Scales</strong> <span style="color:var(--text-dim);">— Full display with EID reader and scales</span></div>
+            <div style="font-size:13px; margin-bottom:4px; color:var(--text-dim);">&#9675; EID Reader Only — Scan tags, add notes, export — no scales</div>
+            <div style="font-size:13px; color:var(--text-dim);">&#9675; Scales Only — Visual tags, photo/video — no EID reader</div>
+        </div>
+        <div class="demo-card">
+            <div style="font-weight:700; margin-bottom:8px;">Data Mode</div>
+            <div style="font-size:13px; margin-bottom:4px;"><span style="color:var(--green);">&#9679;</span> <strong>Cloud</strong> <span style="color:var(--text-dim);">— Sync to AgriEID Cloud for analytics and dashboards</span></div>
+            <div style="font-size:13px; color:var(--text-dim);">&#9675; Manual — CSV export of raw data only — no cloud sync</div>
+        </div>
+    </div>
+
+    <div class="demo-tooltip"><strong>Setup</strong> — Connect your Bluetooth scales and EID reader, choose your display mode and data sync preference. Tap <strong>Connect Scales</strong> to pair wirelessly.</div>
+</div>
+
+<!-- ==================== STEP 2: SCALES CONNECTED ==================== -->
+<div class="demo-step" id="step-2">
+    <div style="font-weight:700; font-size:20px; margin-bottom:16px;">AgriEID</div>
+
+    <div class="setup-btns">
+        <div class="setup-btn green">+ New Session</div>
+        <div class="setup-btn">Historic Sessions</div>
+        <div class="setup-btn">Cloud Data</div>
+        <div class="setup-btn">Cloud Login</div>
+    </div>
+
+    <div class="demo-grid-2">
+        <div class="demo-card" id="scales-card-2">
+            <div style="font-weight:700; margin-bottom:4px;"><span class="status-dot connected" id="scales-dot-2"></span> Weigh Scales</div>
+            <div style="font-size:13px; color:var(--text-secondary); margin-bottom:12px;">Connect to your AGU9i indicator via Bluetooth</div>
+            <div id="scales-btn-2" style="padding:14px; text-align:center; border-radius:var(--radius); border:1px solid rgba(63,185,80,0.3); background:var(--glass-bg); font-weight:600; color:var(--green);">AGU9i Connected</div>
+        </div>
+        <div class="demo-card">
+            <div style="font-weight:700; margin-bottom:4px;"><span class="status-dot"></span> EID Reader</div>
+            <div style="font-size:13px; color:var(--text-secondary); margin-bottom:12px;">Connect via Bluetooth</div>
+            <div style="padding:14px; text-align:center; border-radius:var(--radius); border:1px solid var(--glass-border); background:var(--glass-bg); font-weight:600;">Connect Reader</div>
+            <div style="font-size:12px; margin-top:8px; padding:6px 10px; background:var(--green-dim); border-radius:var(--radius-sm);"><strong style="color:var(--green);">First time?</strong> <span style="color:var(--text-secondary);">If asked for a pairing code, enter <strong>0000</strong> or ignore</span></div>
+        </div>
+    </div>
+
+    <div class="demo-tooltip"><strong>Scales connected!</strong> — Your AGU9i indicator is paired via Bluetooth. Now tap <strong>+ New Session</strong> to start weighing.</div>
+</div>
+
+<!-- ==================== STEP 3: LIVE WEIGHING ==================== -->
+<div class="demo-step" id="step-3">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <span><span class="status-dot connected"></span> <strong>Scales Connected</strong></span>
+        <div class="record-badge">
+            <span class="record-badge-num" id="rec-count">6</span>
+            <span class="record-badge-label">records</span>
+        </div>
+    </div>
+
+    <div class="weight-indicator" id="weight-box">
+        <div class="weight-value" id="weight-display">
+            <span id="weight-num">---</span>
+            <span class="unit">kg</span>
+        </div>
+        <div class="badge-row">
+            <span class="demo-badge green" id="status-badge">LIVE</span>
+            <span class="demo-badge">Gross</span>
+            <span class="demo-badge">kg</span>
+        </div>
+    </div>
+
+    <div class="locked-display" id="locked-section">
+        <div class="locked-label">Locked Weight</div>
+        <div class="locked-val" id="locked-val">0.0 kg</div>
+    </div>
+
+    <div class="demo-lock-btn" id="lock-btn">Lock Weight</div>
+
+    <div class="demo-tooltip"><strong>Real-time weight streaming</strong> — Weight readings flow live from your scales. The display turns orange while the animal is moving, then green when stable. Lock the weight with one tap.</div>
+</div>
+
+<!-- ==================== STEP 4: SESSION RECORDS ==================== -->
+<div class="demo-step" id="step-4">
+    <div class="section-title">Session Records <small>— Morning Weigh, Paddock 3</small></div>
+
+    <div class="demo-grid-3" style="margin-bottom:16px;">
+        <div class="stat-card"><div class="stat-number" id="stat-total">0</div><div class="stat-label">Head Weighed</div></div>
+        <div class="stat-card"><div class="stat-number" id="stat-avg">0</div><div class="stat-label">Avg Weight</div></div>
+        <div class="stat-card"><div class="stat-number" id="stat-range-val">0</div><div class="stat-label">Range (kg)</div></div>
+    </div>
+
+    <div class="demo-card" style="padding:16px;">
+        <svg class="chart-svg" id="session-chart" viewBox="0 0 600 180"></svg>
+    </div>
+
+    <div id="records-list"></div>
+
+    <div class="demo-tooltip"><strong>Instant session stats</strong> — Average weight, range, and head count update live. Export the full session as CSV with one tap.</div>
+</div>
+
+<!-- ==================== STEP 5: SHOP SCALES ==================== -->
+<div class="demo-step" id="step-5">
+    <div style="text-align:center; margin-bottom:24px;">
+        <div style="font-family:'Orbitron',monospace; font-size:24px; font-weight:700; color:var(--green); margin-bottom:8px;">AgriEID Load Bars</div>
+        <div style="font-size:18px; font-weight:600; margin-bottom:4px;">Bluetooth Cattle Scales</div>
+        <div style="color:var(--text-secondary); font-size:14px;">3-year warranty | Free shipping Australia-wide</div>
+    </div>
+
+    <div class="demo-card" style="border-color:rgba(63,185,80,0.3); margin-bottom:20px;">
+        <div style="font-size:14px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--green); margin-bottom:12px;">Available Sizes</div>
+        <div class="demo-grid-3">
+            <div class="demo-card" style="text-align:center; padding:16px; margin:0;">
+                <div style="font-family:'Orbitron',monospace; font-size:20px; font-weight:700; color:var(--green);">600mm</div>
+                <div style="font-size:12px; color:var(--text-secondary); margin-top:4px;">ProGuard Load Bars</div>
+                <div style="font-size:11px; color:var(--text-dim); margin-top:2px;">Most popular</div>
+            </div>
+            <div class="demo-card" style="text-align:center; padding:16px; margin:0;">
+                <div style="font-family:'Orbitron',monospace; font-size:20px; font-weight:700; color:var(--green);">800mm</div>
+                <div style="font-size:12px; color:var(--text-secondary); margin-top:4px;">Heavy Duty</div>
+                <div style="font-size:11px; color:var(--text-dim); margin-top:2px;">Large races</div>
+            </div>
+            <div class="demo-card" style="text-align:center; padding:16px; margin:0;">
+                <div style="font-family:'Orbitron',monospace; font-size:20px; font-weight:700; color:var(--green);">1000mm</div>
+                <div style="font-size:12px; color:var(--text-secondary); margin-top:4px;">Extreme Duty</div>
+                <div style="font-size:11px; color:var(--text-dim); margin-top:2px;">Rated to 5 tonnes</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="demo-grid-2" style="margin-bottom:20px;">
+        <div class="feature-card"><div class="feature-icon">&#128225;</div><div class="feature-title">Wireless Bluetooth</div><div class="feature-desc">No cables — connects to any phone</div></div>
+        <div class="feature-card"><div class="feature-icon">&#128267;</div><div class="feature-title">7-Day Battery</div><div class="feature-desc">Rechargeable, lasts all week</div></div>
+        <div class="feature-card"><div class="feature-icon">&#128247;</div><div class="feature-title">Free Software</div><div class="feature-desc">AgriEID Lite app + 6 months cloud</div></div>
+        <div class="feature-card"><div class="feature-icon">&#128666;</div><div class="feature-title">Free Shipping</div><div class="feature-desc">Australia-wide delivery included</div></div>
+    </div>
+
+    <a class="cta-main" href="https://agrieid.com.au/collections/agrieid-products" target="_blank">Shop Cattle Scales</a>
+    <a class="cta-secondary" href="https://agrieid.com.au/pages/pricing-1" target="_blank">View All Pricing</a>
+    <div style="text-align:center; margin-top:12px;">
+        <a class="cta-secondary" href="https://ae-weighapp.vercel.app/" target="_blank" style="color:var(--green);">Try the Free App</a>
+    </div>
+    <div class="cta-note">All scales include AGU9i Bluetooth indicator, free AgriEID Lite app, and 6 months cloud software access.</div>
+</div>
+
+<!-- ==================== BOTTOM NAV ==================== -->
+<div class="demo-nav">
+    <button class="demo-btn" id="btn-back" onclick="prevStep()">Back</button>
+    <div class="demo-nav-dots" id="nav-dots"></div>
+    <button class="demo-btn primary" id="btn-next" onclick="nextStep()">Next</button>
+</div>
+
+<script>
+const STEP_NAMES = ['Setup','Scales Connected','Live Weighing','Session Records','Shop Scales'];
+const TOTAL_STEPS = 5;
+const SESSION_WEIGHTS = [
+    { vid: 'Y247', weight: 483.0, time: '10:32' },
+    { vid: 'R089', weight: 445.0, time: '10:29' },
+    { vid: 'B156', weight: 512.0, time: '10:25' },
+    { vid: 'Y331', weight: 498.5, time: '10:22' },
+    { vid: 'Y418', weight: 467.5, time: '10:18' },
+    { vid: 'R203', weight: 534.0, time: '10:14' },
+    { vid: 'Y102', weight: 521.5, time: '10:10' },
+];
+
+let currentStep = 1;
+let stepTimers = [];
+let autoAdvanceTimer = null;
+
+function clearTimers() {
+    stepTimers.forEach(t => clearTimeout(t)); stepTimers = [];
+    if (autoAdvanceTimer) { clearTimeout(autoAdvanceTimer); autoAdvanceTimer = null; }
+}
+
+function flashNextBtn() { document.getElementById('btn-next').classList.add('flash'); }
+
+function scheduleAutoAdvance(sec) {
+    if (autoAdvanceTimer) clearTimeout(autoAdvanceTimer);
+    stepTimers.push(setTimeout(flashNextBtn, sec * 500));
+    autoAdvanceTimer = setTimeout(() => { if (currentStep < TOTAL_STEPS) nextStep(); }, sec * 1000);
+}
+
+function showToast(msg, dur) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), dur || 2000);
+}
+
+function countUp(el, target, duration, decimals) {
+    decimals = decimals || 0; duration = duration || 1000;
+    const start = performance.now();
+    const tick = () => {
+        const p = Math.min((performance.now() - start) / duration, 1);
+        const e = 1 - Math.pow(1 - p, 3);
+        el.textContent = (target * e).toFixed(decimals);
+        if (p < 1) requestAnimationFrame(tick); else el.textContent = target.toFixed(decimals);
+    };
+    requestAnimationFrame(tick);
+}
+
+function goToStep(n) {
+    if (n < 1 || n > TOTAL_STEPS) return;
+    clearTimers();
+    document.querySelectorAll('.demo-step').forEach(s => s.classList.remove('active'));
+    document.getElementById('step-' + n).classList.add('active');
+    currentStep = n;
+
+    document.getElementById('progress-bar').style.width = ((n / TOTAL_STEPS) * 100) + '%';
+    const label = document.getElementById('step-label');
+    label.textContent = 'Step ' + n + ' of ' + TOTAL_STEPS + ' \u2014 ' + STEP_NAMES[n - 1];
+    label.style.opacity = '1';
+
+    document.getElementById('btn-back').classList.toggle('hidden', n === 1);
+    const nextBtn = document.getElementById('btn-next');
+    nextBtn.classList.remove('flash');
+    if (n === TOTAL_STEPS) { nextBtn.textContent = 'Shop Now'; nextBtn.onclick = () => window.open('https://agrieid.com.au/collections/agrieid-products', '_blank'); }
+    else { nextBtn.textContent = 'Next'; nextBtn.onclick = nextStep; }
+
+    document.querySelectorAll('.demo-nav-dot').forEach((d, i) => {
+        d.className = 'demo-nav-dot';
+        if (i + 1 === n) d.classList.add('active');
+        else if (i + 1 < n) d.classList.add('visited');
+    });
+
+    window.scrollTo(0, 0);
+
+    if (n === 1) initSetup();
+    if (n === 3) initWeighing();
+    if (n === 4) initRecords();
+
+    if (n < TOTAL_STEPS) scheduleAutoAdvance(10);
+    else stepTimers.push(setTimeout(flashNextBtn, 3000));
+}
+
+function nextStep() { goToStep(currentStep + 1); }
+function prevStep() { goToStep(currentStep - 1); }
+document.addEventListener('keydown', e => { if (e.key === 'ArrowRight') nextStep(); if (e.key === 'ArrowLeft') prevStep(); });
+
+// === STEP 1: SETUP — auto-connect scales animation ===
+function initSetup() {
+    const dot = document.getElementById('scales-dot');
+    const btn = document.getElementById('scales-btn');
+    dot.className = 'status-dot';
+    btn.textContent = 'Connect Scales';
+    btn.style.cssText = 'padding:14px; text-align:center; border-radius:var(--radius); border:1px solid var(--glass-border); background:var(--glass-bg); font-weight:600;';
+
+    stepTimers.push(setTimeout(() => {
+        btn.textContent = 'Searching...';
+        btn.style.color = 'var(--orange)';
+    }, 1500));
+
+    stepTimers.push(setTimeout(() => {
+        dot.classList.add('connected');
+        btn.textContent = 'AGU9i Connected';
+        btn.style.borderColor = 'rgba(63,185,80,0.3)';
+        btn.style.color = 'var(--green)';
+        showToast('AGU9i Scales connected via Bluetooth');
+    }, 3500));
+}
+
+// === STEP 3: LIVE WEIGHING ===
+function initWeighing() {
+    const weightNum = document.getElementById('weight-num');
+    const weightDisplay = document.getElementById('weight-display');
+    const weightBox = document.getElementById('weight-box');
+    const statusBadge = document.getElementById('status-badge');
+    const lockBtn = document.getElementById('lock-btn');
+    const lockedSection = document.getElementById('locked-section');
+    const lockedVal = document.getElementById('locked-val');
+    const recCount = document.getElementById('rec-count');
+
+    weightNum.textContent = '---';
+    weightDisplay.className = 'weight-value';
+    weightBox.className = 'weight-indicator';
+    statusBadge.className = 'demo-badge green'; statusBadge.textContent = 'LIVE';
+    lockBtn.className = 'demo-lock-btn'; lockBtn.textContent = 'Lock Weight';
+    lockedSection.className = 'locked-display';
+    recCount.textContent = '6';
+
+    const target = 483.0;
+    let iv = null;
+
+    stepTimers.push(setTimeout(() => {
+        weightDisplay.classList.add('dynamic');
+        weightBox.classList.add('dynamic');
+        statusBadge.className = 'demo-badge orange'; statusBadge.textContent = 'MOVING';
+
+        iv = setInterval(() => {
+            weightNum.textContent = (target + (Math.random() - 0.5) * 4).toFixed(1);
+        }, 150);
+
+        stepTimers.push(setTimeout(() => {
+            clearInterval(iv);
+            weightNum.textContent = target.toFixed(1);
+            weightDisplay.className = 'weight-value';
+            weightBox.className = 'weight-indicator steady';
+            statusBadge.className = 'demo-badge green'; statusBadge.textContent = 'STEADY';
+
+            stepTimers.push(setTimeout(() => {
+                lockBtn.classList.add('locked'); lockBtn.textContent = 'Weight Locked';
+                lockedVal.textContent = target.toFixed(1) + ' kg';
+                lockedSection.classList.add('visible');
+                showToast('Record saved \u2014 ' + target.toFixed(1) + ' kg');
+                recCount.textContent = '7';
+            }, 1200));
+        }, 3000));
+    }, 600));
+}
+
+// === STEP 4: SESSION RECORDS ===
+function initRecords() {
+    const weights = SESSION_WEIGHTS.map(r => r.weight);
+    const avg = weights.reduce((a, b) => a + b, 0) / weights.length;
+    const range = Math.max(...weights) - Math.min(...weights);
+
+    countUp(document.getElementById('stat-total'), weights.length, 800);
+    countUp(document.getElementById('stat-avg'), avg, 1000, 1);
+    countUp(document.getElementById('stat-range-val'), range, 1000, 1);
+
+    // Build records list
+    const list = document.getElementById('records-list');
+    list.innerHTML = '';
+    SESSION_WEIGHTS.forEach((r, i) => {
+        const row = document.createElement('div');
+        row.className = 'record-row';
+        row.innerHTML = '<span class="rec-num">#' + (i + 1) + '</span><span class="rec-vid">' + r.vid + '</span><span class="rec-weight">' + r.weight.toFixed(1) + ' kg</span><span class="rec-time">' + r.time + '</span>';
+        row.style.opacity = '0'; row.style.transition = 'opacity 0.3s';
+        list.appendChild(row);
+        stepTimers.push(setTimeout(() => row.style.opacity = '1', 200 + i * 100));
+    });
+
+    // Draw session bar chart
+    drawSessionChart();
+}
+
+function drawSessionChart() {
+    const svg = document.getElementById('session-chart');
+    svg.innerHTML = '';
+    const W = 600, H = 180, PAD = { top: 10, right: 20, bottom: 25, left: 50 };
+    const data = SESSION_WEIGHTS.slice().reverse();
+    const minW = Math.min(...data.map(d => d.weight)) - 10;
+    const maxW = Math.max(...data.map(d => d.weight)) + 10;
+    const barW = Math.min(50, (W - PAD.left - PAD.right) / data.length - 8);
+
+    // Grid
+    for (let i = 0; i < 4; i++) {
+        const y = PAD.top + (i / 3) * (H - PAD.top - PAD.bottom);
+        const val = maxW - (i / 3) * (maxW - minW);
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', PAD.left); line.setAttribute('x2', W - PAD.right);
+        line.setAttribute('y1', y); line.setAttribute('y2', y);
+        line.setAttribute('class', 'chart-grid');
+        svg.appendChild(line);
+        const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        label.setAttribute('x', PAD.left - 8); label.setAttribute('y', y + 4);
+        label.setAttribute('text-anchor', 'end'); label.setAttribute('class', 'chart-label');
+        label.textContent = val.toFixed(0);
+        svg.appendChild(label);
+    }
+
+    // Bars
+    data.forEach((d, i) => {
+        const x = PAD.left + (i + 0.5) * ((W - PAD.left - PAD.right) / data.length) - barW / 2;
+        const barH = ((d.weight - minW) / (maxW - minW)) * (H - PAD.top - PAD.bottom);
+        const y = H - PAD.bottom - barH;
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('x', x); rect.setAttribute('y', H - PAD.bottom);
+        rect.setAttribute('width', barW); rect.setAttribute('height', 0);
+        rect.setAttribute('rx', 4);
+        rect.setAttribute('fill', 'var(--green)'); rect.setAttribute('opacity', '0.7');
+        svg.appendChild(rect);
+        // Animate bar growing
+        stepTimers.push(setTimeout(() => {
+            rect.setAttribute('y', y); rect.setAttribute('height', barH);
+            rect.style.transition = 'y 0.4s ease, height 0.4s ease';
+        }, 300 + i * 100));
+
+        // Label
+        const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        label.setAttribute('x', x + barW / 2); label.setAttribute('y', H - 5);
+        label.setAttribute('text-anchor', 'middle'); label.setAttribute('class', 'chart-label');
+        label.textContent = d.vid;
+        svg.appendChild(label);
+    });
+}
+
+// === INIT ===
+function init() {
+    const dots = document.getElementById('nav-dots');
+    for (let i = 1; i <= TOTAL_STEPS; i++) {
+        const dot = document.createElement('div');
+        dot.className = 'demo-nav-dot' + (i === 1 ? ' active' : '');
+        dot.onclick = () => goToStep(i);
+        dots.appendChild(dot);
+    }
+    goToStep(1);
+}
+init();
+</script>
+</body>
+</html>

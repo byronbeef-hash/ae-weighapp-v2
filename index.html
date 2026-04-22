@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0a0e14">
+    <title>AgriEID</title>
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <!-- iOS PWA -->
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="stylesheet" href="styles.css?v=21">
+</head>
+<body>
+<!-- Diagnostic status bar — visible immediately, updated by JS -->
+<div id="app-status" class="app-status-bar"><span id="app-status-text">loading...</span><button class="status-debug-btn" id="btn-debug-toggle">DBG</button></div>
+
+<!-- ===================== SETUP SCREEN ===================== -->
+<div id="screen-setup" class="screen active">
+    <div class="header">
+        <h1>AgriEID</h1>
+    </div>
+
+    <div class="ios-hint" id="ios-hint" style="display:none;">
+        <span>📱 Using an Apple device? Use a Bluetooth browser for full functionality —</span>
+        <a href="https://apps.apple.com/app/bluefy-web-ble-browser/id1492822055" target="_blank" rel="noopener">Download Bluefy</a>
+    </div>
+
+    <div class="setup-actions setup-actions-4">
+        <button class="btn btn-save" id="btn-new-session-setup">+ New Session</button>
+        <button class="btn btn-outline btn-historic" id="btn-historic-sessions">Historic Sessions</button>
+        <button class="btn btn-outline btn-cloud-data" id="btn-cloud-data">Cloud Data</button>
+        <button class="btn btn-outline btn-cloud-connect" id="btn-cloud-toggle">Cloud Login</button>
+    </div>
+
+    <!-- Cloud login dropdown (hidden by default) -->
+    <div class="cloud-dropdown" id="cloud-dropdown" style="display:none;">
+        <div id="sync-status-badge" class="sync-badge sync-offline">Not logged in</div>
+
+        <div class="cloud-login" id="cloud-login">
+            <div class="cloud-login-row">
+                <input type="text" class="form-input" id="cloud-email" placeholder="Username or Email" autocomplete="username">
+                <input type="password" class="form-input" id="cloud-password" placeholder="Password" autocomplete="current-password">
+                <button class="btn btn-small btn-cloud-login" id="btn-cloud-login">Log In</button>
+            </div>
+            <div class="cloud-login-extras">
+                <label class="cloud-save-details">
+                    <input type="checkbox" id="cloud-save-details"> Save my details
+                </label>
+                <button class="btn btn-small btn-outline btn-biometric-login" id="btn-biometric-login" style="display:none;">Log In with Face ID</button>
+                <a href="https://www.livestockpro.app/register" target="_blank" class="btn-register-link">Don't have an account? Register here</a>
+            </div>
+        </div>
+
+        <div class="cloud-account" id="cloud-account" style="display:none;">
+            <div class="cloud-user-row">
+                <span class="cloud-user-email" id="cloud-user-email"></span>
+                <button class="btn btn-small btn-outline" id="btn-cloud-logout" style="padding:6px 12px; font-size:12px;">Disconnect</button>
+            </div>
+            <div class="cloud-sync-actions" style="margin-top:12px;">
+                <button class="btn btn-small btn-outline cloud-sync-btn" id="btn-lp-push">
+                    <span class="cloud-btn-icon">&#x2B06;</span> Push
+                </button>
+                <button class="btn btn-small btn-outline cloud-sync-btn" id="btn-lp-pull">
+                    <span class="cloud-btn-icon">&#x2B07;</span> Pull
+                </button>
+            </div>
+            <div class="cloud-sync-actions" style="margin-top:6px;">
+                <button class="btn btn-small btn-outline cloud-sync-btn" id="btn-lp-fetch-batches">Fetch Batches</button>
+            </div>
+            <div class="sync-progress-bar" id="sync-progress-bar" style="display:none;">
+                <div class="sync-progress-fill" id="sync-progress-fill"></div>
+                <span class="sync-progress-text" id="sync-progress-text">Syncing...</span>
+            </div>
+            <div class="cloud-sync-status" id="cloud-sync-status"></div>
+            <div class="sync-last-time" id="sync-last-time"></div>
+        </div>
+    </div>
+
+    <div class="setup-card" id="setup-scales">
+        <h3>Weigh Scales</h3>
+        <p>Connect to your AGU9i indicator via Bluetooth</p>
+        <div class="btn-row">
+            <button class="btn btn-connect" id="btn-connect-scales">Connect Scales</button>
+            <button class="btn btn-small btn-danger" id="btn-disconnect-scales" style="display:none; flex:0 0 auto; width: auto; padding: 14px 20px;">Disconnect</button>
+        </div>
+        <div class="device-name" id="scales-device-name"></div>
+    </div>
+
+    <div class="setup-card" id="setup-eid">
+        <h3>EID Reader</h3>
+        <p>Connect via Bluetooth</p>
+        <div class="btn-row">
+            <button class="btn btn-connect" id="btn-connect-reader">Connect Reader</button>
+            <button class="btn btn-small btn-danger" id="btn-disconnect-reader" style="display:none; flex:0 0 auto; width: auto; padding: 14px 20px;">Disconnect</button>
+        </div>
+        <div class="pairing-hint" id="pairing-hint" style="margin-top:8px; padding:8px 12px; background:rgba(63,185,80,0.1); border:1px solid rgba(63,185,80,0.3); border-radius:8px; font-size:12px; color:#8b949e; line-height:1.4;">
+            <strong style="color:#3fb950;">First time?</strong> If asked for a pairing code, enter <strong style="color:#e6edf3;">0000</strong> or ignore
+        </div>
+        <div class="device-name" id="reader-device-name"></div>
+        <button class="btn btn-small btn-outline" id="btn-download-tags" style="display:none; margin-top:12px;">Download Stored Tags</button>
+        <div class="download-progress" id="download-progress" style="display:none;">
+            <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+            <span class="progress-text" id="progress-text">0 / 0</span>
+        </div>
+        <div class="downloaded-tags" id="downloaded-tags" style="display:none;"></div>
+        <button class="btn btn-small btn-danger" id="btn-delete-reader-tags" style="display:none; margin-top:8px;">Delete All from Reader</button>
+    </div>
+
+    <div class="setup-card" id="setup-display-mode">
+        <h3>Display Mode</h3>
+        <p>Choose which features to show on the weighing screen</p>
+        <div class="display-mode-options">
+            <label class="display-mode-option">
+                <input type="radio" name="display-mode" value="combined" checked>
+                <div class="display-mode-info">
+                    <span class="display-mode-name">EID + Scales</span>
+                    <span class="display-mode-desc">Full display with EID reader and scales</span>
+                </div>
+            </label>
+            <label class="display-mode-option">
+                <input type="radio" name="display-mode" value="eid-only">
+                <div class="display-mode-info">
+                    <span class="display-mode-name">EID Reader Only</span>
+                    <span class="display-mode-desc">Scan tags, add notes, export — no scales</span>
+                </div>
+            </label>
+            <label class="display-mode-option">
+                <input type="radio" name="display-mode" value="scales-only">
+                <div class="display-mode-info">
+                    <span class="display-mode-name">Scales Only</span>
+                    <span class="display-mode-desc">Visual tags, photo/video — no EID reader</span>
+                </div>
+            </label>
+        </div>
+    </div>
+
+    <div class="setup-card" id="setup-data-mode">
+        <h3>Data Mode</h3>
+        <p>Choose how you manage your records</p>
+        <div class="display-mode-options">
+            <label class="display-mode-option">
+                <input type="radio" name="data-mode" value="cloud" checked>
+                <div class="display-mode-info">
+                    <span class="display-mode-name">Cloud</span>
+                    <span class="display-mode-desc">Sync to AgriEID Cloud for analytics and dashboards</span>
+                </div>
+            </label>
+            <label class="display-mode-option">
+                <input type="radio" name="data-mode" value="manual">
+                <div class="display-mode-info">
+                    <span class="display-mode-name">Manual</span>
+                    <span class="display-mode-desc">CSV export of raw data only — no cloud sync</span>
+                </div>
+            </label>
+        </div>
+    </div>
+
+    <!-- Cloud card removed — login is now in the dropdown above -->
+
+    <div class="debug-panel" id="debug-panel">
+        <button class="debug-copy-btn" id="btn-debug-copy" title="Copy debug log">📋</button>
+    </div>
+</div>
+
+<!-- ===================== DASHBOARD SCREEN ===================== -->
+<div id="screen-dashboard" class="screen">
+    <div class="header">
+        <h1>Sessions</h1>
+        <div class="header-right">
+            <button class="btn btn-small btn-outline" id="btn-dashboard-setup">Setup</button>
+        </div>
+    </div>
+
+    <button class="btn btn-save" id="btn-new-session" style="margin-bottom: 20px;">+ New Session</button>
+
+    <div class="dashboard-list" id="dashboard-list">
+        <!-- Sessions populated by JS -->
+    </div>
+</div>
+
+<!-- ===================== SESSION SCREEN ===================== -->
+<div id="screen-session" class="screen">
+    <div class="header">
+        <h1>New Session</h1>
+        <div class="header-right">
+            <button class="btn btn-small btn-outline" id="btn-session-back">Back</button>
+        </div>
+    </div>
+
+    <div class="session-form">
+        <div class="form-group">
+            <label class="form-label">Session Name</label>
+            <input type="text" class="form-input" id="input-session-name" placeholder="e.g. Morning Weigh">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Mob / Lot</label>
+            <input type="text" class="form-input" id="input-mob" placeholder="e.g. Mob 47">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Paddock / Location</label>
+            <input type="text" class="form-input" id="input-paddock" placeholder="e.g. Paddock 3">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Expected Count (optional)</label>
+            <input type="number" class="form-input" id="input-expected" placeholder="e.g. 200">
+        </div>
+    </div>
+
+    <button class="btn btn-save" id="btn-create-session">Start Weighing</button>
+</div>
+
+<!-- ===================== MAIN WEIGHING SCREEN ===================== -->
+<div id="screen-main" class="screen">
+    <!-- Status Bar -->
+    <div class="status-bar">
+        <div class="status-item">
+            <div class="status-dot" id="main-scales-dot"></div>
+            <span>Scales</span>
+        </div>
+        <div class="status-item">
+            <div class="status-dot" id="main-reader-dot"></div>
+            <span>Reader</span>
+        </div>
+        <div class="header-right">
+            <button class="btn btn-small btn-outline" id="btn-view-records">Records</button>
+            <button class="btn btn-small btn-outline" id="btn-settings">Setup</button>
+        </div>
+    </div>
+
+    <!-- Session Info + Stats -->
+    <div class="session-bar">
+        <div class="session-bar-top">
+            <span id="session-name-display">Session</span>
+            <div class="session-count-badge" id="session-count-display">
+                <span class="session-count-number" id="session-count-number">0</span>
+                <span class="session-count-label">records</span>
+            </div>
+        </div>
+        <div class="session-stats" id="session-stats" style="display:none;">
+            <div class="session-stats-row">
+                <div class="stat-item">
+                    <span class="stat-label">Avg</span>
+                    <span class="stat-value" id="stat-avg">—</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Min</span>
+                    <span class="stat-value" id="stat-min">—</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Max</span>
+                    <span class="stat-value" id="stat-max">—</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Total</span>
+                    <span class="stat-value" id="stat-total">—</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Auto Weigh Mode -->
+    <div class="auto-weigh-bar" id="auto-weigh-bar" style="display:none;">
+        <div class="auto-weigh-header">
+            <span class="auto-weigh-title">Auto Weigh</span>
+            <div class="auto-weigh-controls">
+                <label class="auto-save-toggle">
+                    <input type="checkbox" id="auto-save-checkbox"> Auto Save
+                </label>
+                <button class="btn btn-small btn-outline auto-weigh-stop" id="btn-stop-auto-weigh">Stop</button>
+            </div>
+        </div>
+        <div class="auto-weigh-status" id="auto-weigh-status">Waiting for empty scales...</div>
+    </div>
+
+    <!-- Weight Hero: centred, takes up 50%+ of first fold -->
+    <div class="weight-hero">
+        <!-- Digital Weight Indicator -->
+        <div class="indicator-container disconnected" id="indicator">
+            <div class="weight-display disconnected" id="weight-display">
+                <span id="weight-value">---</span>
+                <span class="unit" id="weight-unit">kg</span>
+            </div>
+            <div class="indicator-status">
+                <span class="indicator-badge" id="badge-status">OFFLINE</span>
+                <span class="indicator-badge" id="badge-type">Gross</span>
+                <span class="indicator-badge" id="badge-unit">kg</span>
+            </div>
+        </div>
+
+        <!-- Locked Weight -->
+        <div class="locked-weight" id="locked-weight-section">
+            <div class="locked-weight-label">Locked Weight</div>
+            <div class="locked-weight-value" id="locked-weight-value">0.0 kg</div>
+        </div>
+
+        <!-- Lock Weight Button -->
+        <div class="action-section">
+            <div class="btn-row">
+                <button class="btn btn-lock" id="btn-lock-weight">Lock Weight</button>
+                <button class="btn btn-small btn-outline" id="btn-auto-weigh" style="flex:0 0 auto; width:auto; padding:14px 20px;">Auto</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Entry Fields -->
+    <div class="data-entry-section">
+        <div class="data-entry-columns">
+            <!-- EID Section -->
+            <div class="eid-section" id="eid-section">
+                <div class="eid-label">EID Tag</div>
+                <div class="eid-input-row">
+                    <input type="text" class="eid-input" id="input-eid" placeholder="Enter or scan EID">
+                    <button class="btn btn-small btn-scan" id="btn-scan-eid" style="flex:0 0 auto; width:auto; padding:10px 14px;">Scan</button>
+                    <button class="btn btn-small btn-scan" id="btn-auto-scan-eid" style="flex:0 0 auto; width:auto; padding:10px 14px;">Auto</button>
+                    <button class="btn btn-small btn-scan" id="btn-clear-eid" style="display:none; flex:0 0 auto; width:auto; padding:10px 14px;">Clear</button>
+                </div>
+                <div class="eid-existing-notice" id="eid-existing" style="display:none;">Existing record — new weight will be added</div>
+            </div>
+
+            <!-- Visual Tag (Management Tag / VID) -->
+            <div class="vid-section" id="vid-section">
+                <div class="vid-label">Visual Tag</div>
+                <div class="vid-input-row">
+                    <input type="text" class="vid-input" id="input-vid" placeholder="Management tag number">
+                    <button class="btn btn-small btn-outline" id="btn-search-animal" style="flex:0 0 auto; width:auto; padding:10px 14px;">Search</button>
+                </div>
+            </div>
+
+            <!-- Medical Batch -->
+            <div class="medical-batch-section" id="medical-batch-section">
+                <div class="medical-batch-label">Medical Batch</div>
+                <div class="medical-batch-row">
+                    <select class="form-input medical-batch-select" id="input-medical-batch">
+                        <option value="">None</option>
+                    </select>
+                    <button class="btn btn-small btn-outline medical-batch-new-btn" id="btn-new-batch">+ New</button>
+                </div>
+            </div>
+
+            <!-- Photo / Video Capture -->
+            <div class="media-section" id="media-section">
+                <div class="media-label">Photo / Video</div>
+                <div class="media-row">
+                    <button class="btn btn-small btn-outline media-btn" id="btn-take-photo">Photo</button>
+                    <button class="btn btn-small btn-outline media-btn" id="btn-take-video">Video</button>
+                    <button class="btn btn-small btn-outline media-btn" id="btn-identify-animal" title="Identify animal from photo">Identify</button>
+                </div>
+                <input type="file" id="input-photo" accept="image/*" capture="environment" style="display:none;">
+                <input type="file" id="input-video" accept="video/*" capture="environment" style="display:none;">
+                <input type="file" id="input-identify-photo" accept="image/*" capture="environment" style="display:none;">
+                <div class="media-preview" id="media-preview" style="display:none;"></div>
+            </div>
+
+            <!-- Animal History Panel (auto-shows when EID has previous records) -->
+            <div class="animal-history" id="animal-history" style="display:none;">
+                <div class="animal-history-header">
+                    <span class="animal-history-title">Animal History</span>
+                    <span class="animal-history-count" id="history-count"></span>
+                </div>
+                <div class="animal-history-stats">
+                    <div class="history-stat">
+                        <div class="history-stat-label">Last Weight</div>
+                        <div class="history-stat-value" id="history-last-weight">—</div>
+                    </div>
+                    <div class="history-stat">
+                        <div class="history-stat-label">Last Weighed</div>
+                        <div class="history-stat-value" id="history-last-date">—</div>
+                    </div>
+                    <div class="history-stat">
+                        <div class="history-stat-label">ADG (Local)</div>
+                        <div class="history-stat-value" id="history-adg">—</div>
+                    </div>
+                    <div class="history-stat" id="history-cloud-adg-section" style="display:none;">
+                        <div class="history-stat-label">ADG (Cloud)</div>
+                        <div class="history-stat-value" id="history-cloud-adg">—</div>
+                    </div>
+                </div>
+                <div class="chart-container" id="weight-chart"></div>
+            </div>
+
+            <!-- Date -->
+            <div class="record-fields">
+                <input type="date" class="date-input" id="input-date">
+            </div>
+
+            <!-- Notes -->
+            <div class="notes-section" id="notes-section">
+                <div class="notes-label">Notes</div>
+                <div class="notes-input-row">
+                    <textarea class="notes-textarea" id="input-notes" placeholder="Type notes..." rows="2"></textarea>
+                    <button class="btn-mic" id="btn-mic" title="Voice dictation">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                            <line x1="12" y1="19" x2="12" y2="23"/>
+                            <line x1="8" y1="23" x2="16" y2="23"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Save -->
+            <div class="action-section">
+                <button class="btn btn-save" id="btn-save-record" disabled>Save Record</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Records Footer -->
+    <div class="records-footer">
+        <div class="records-footer-row">
+            <span id="footer-count">Records: 0</span>
+            <div style="display:flex; gap:8px; align-items:center;">
+                <span id="footer-expected"></span>
+                <button class="btn btn-small btn-outline" id="btn-export-csv-main" style="padding:4px 10px; font-size:11px;">Export CSV</button>
+            </div>
+        </div>
+        <div class="records-footer-last" id="footer-last"></div>
+    </div>
+
+    <!-- Recent Records (inline on main screen) -->
+    <div class="recent-records" id="recent-records" style="display:none;">
+        <div class="recent-records-header">
+            <span class="recent-records-title">Recent Records</span>
+            <button class="btn btn-small btn-outline" id="btn-view-all-records" style="padding:4px 10px; font-size:11px;">View All</button>
+        </div>
+        <div class="recent-records-list" id="recent-records-list"></div>
+    </div>
+</div>
+
+<!-- ===================== RECORDS SCREEN ===================== -->
+<div id="screen-records" class="screen">
+    <div class="header">
+        <h1>Session Records</h1>
+        <div class="header-right">
+            <button class="btn btn-small btn-outline" id="btn-export-csv">Export CSV</button>
+            <button class="btn btn-small btn-outline" id="btn-back-main">Back</button>
+        </div>
+    </div>
+
+    <div class="session-bar">
+        <span id="records-session-name"></span>
+        <span id="records-total"></span>
+    </div>
+
+    <div class="records-list" id="records-list">
+        <!-- Records populated by JS -->
+    </div>
+</div>
+
+<!-- ===================== CLOUD DASHBOARD SCREEN ===================== -->
+<div id="screen-cloud-dashboard" class="screen">
+    <div class="header">
+        <h1>Cloud Data</h1>
+        <div class="header-right">
+            <button class="btn btn-small btn-outline" id="btn-cloud-dash-back">Back</button>
+        </div>
+    </div>
+
+    <div class="cloud-dash-stats" id="cloud-dash-stats">
+        <div class="cloud-stat-card">
+            <div class="cloud-stat-value" id="cloud-stat-animals">—</div>
+            <div class="cloud-stat-label">Animals</div>
+        </div>
+        <div class="cloud-stat-card">
+            <div class="cloud-stat-value" id="cloud-stat-records">—</div>
+            <div class="cloud-stat-label">Records</div>
+        </div>
+        <div class="cloud-stat-card">
+            <div class="cloud-stat-value" id="cloud-stat-sessions">—</div>
+            <div class="cloud-stat-label">Sessions</div>
+        </div>
+        <div class="cloud-stat-card">
+            <div class="cloud-stat-value" id="cloud-stat-sync">—</div>
+            <div class="cloud-stat-label">Last Sync</div>
+        </div>
+    </div>
+
+    <div class="cloud-dash-pull-status" id="cloud-dash-pull-status"></div>
+
+    <div class="cloud-dash-list" id="cloud-dash-list">
+        <!-- Animal rows populated by JS -->
+    </div>
+</div>
+
+<!-- ===================== ANIMAL DETAIL SCREEN ===================== -->
+<div id="screen-animal-detail" class="screen">
+    <div class="header">
+        <h1 id="animal-detail-title">Animal</h1>
+        <div class="header-right">
+            <button class="btn btn-small btn-outline" id="btn-animal-back">Back</button>
+        </div>
+    </div>
+
+    <div class="animal-chart-container">
+        <canvas id="animal-weight-chart" width="600" height="250"></canvas>
+    </div>
+
+    <div class="animal-stats" id="animal-stats">
+        <div class="cloud-stat-card">
+            <div class="cloud-stat-value" id="animal-stat-weight">—</div>
+            <div class="cloud-stat-label">Latest</div>
+        </div>
+        <div class="cloud-stat-card">
+            <div class="cloud-stat-value" id="animal-stat-adg">—</div>
+            <div class="cloud-stat-label">ADG</div>
+        </div>
+        <div class="cloud-stat-card">
+            <div class="cloud-stat-value" id="animal-stat-count">—</div>
+            <div class="cloud-stat-label">Weighings</div>
+        </div>
+        <div class="cloud-stat-card">
+            <div class="cloud-stat-value" id="animal-stat-range">—</div>
+            <div class="cloud-stat-label">Range</div>
+        </div>
+    </div>
+
+    <div class="animal-history-list" id="animal-history-list">
+        <!-- History rows populated by JS -->
+    </div>
+</div>
+
+<!-- ===================== AUTO WEIGH SCREEN ===================== -->
+<div id="screen-autoweigh" class="screen">
+    <div class="header">
+        <h1>Auto Weigh</h1>
+        <div class="header-right">
+            <button class="btn btn-small btn-outline" id="btn-autoweigh-back">Back</button>
+        </div>
+    </div>
+
+    <!-- Master Toggle -->
+    <div class="setup-card aw-toggle-card">
+        <div class="aw-toggle-row">
+            <div>
+                <h3>Auto Weigh Mode</h3>
+                <p>Fully autonomous weighing and EID scanning</p>
+            </div>
+            <label class="toggle-switch">
+                <input type="checkbox" id="aw-toggle">
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+    </div>
+
+    <!-- Parameters -->
+    <div class="setup-card">
+        <h3>Parameters</h3>
+        <div class="aw-param-list">
+            <div class="aw-param">
+                <label class="form-label">Weight Threshold (kg)</label>
+                <p class="aw-param-desc">Weight below this = empty scales (animal off)</p>
+                <input type="number" class="form-input" id="aw-threshold" value="5.0" step="0.5" min="1" max="50" inputmode="decimal">
+            </div>
+            <div class="aw-param">
+                <label class="form-label">Steady Time (seconds)</label>
+                <p class="aw-param-desc">How long weight must be stable before auto-locking</p>
+                <input type="number" class="form-input" id="aw-steady-time" value="0" step="1" min="0" max="10" inputmode="numeric">
+            </div>
+        </div>
+    </div>
+
+    <!-- Features -->
+    <div class="setup-card">
+        <h3>Features</h3>
+        <div class="aw-feature-list">
+            <label class="aw-feature">
+                <input type="checkbox" id="aw-auto-scan" checked>
+                <div>
+                    <span class="aw-feature-name">Auto EID Scan</span>
+                    <span class="aw-feature-desc">Trigger continuous EID scan when weight locks</span>
+                </div>
+            </label>
+            <label class="aw-feature">
+                <input type="checkbox" id="aw-auto-save">
+                <div>
+                    <span class="aw-feature-name">Auto Save</span>
+                    <span class="aw-feature-desc">Automatically save record when weight + EID captured</span>
+                </div>
+            </label>
+            <label class="aw-feature">
+                <input type="checkbox" id="aw-beep" checked>
+                <div>
+                    <span class="aw-feature-name">Sound Alerts</span>
+                    <span class="aw-feature-desc">Beep on weight lock, EID scan, and save</span>
+                </div>
+            </label>
+        </div>
+    </div>
+
+    <!-- Live Status (only when active) -->
+    <div class="setup-card aw-status-card" id="aw-status-card" style="display:none;">
+        <h3>Status</h3>
+        <div class="aw-live-status">
+            <div class="aw-phase-indicator" id="aw-phase-indicator">
+                <div class="aw-phase-dot" id="aw-phase-dot"></div>
+                <span class="aw-phase-text" id="aw-phase-text">Idle</span>
+            </div>
+            <div class="aw-stats-row">
+                <div class="aw-stat">
+                    <span class="aw-stat-label">Auto Saved</span>
+                    <span class="aw-stat-value" id="aw-auto-count">0</span>
+                </div>
+                <div class="aw-stat">
+                    <span class="aw-stat-label">Current Weight</span>
+                    <span class="aw-stat-value" id="aw-current-weight">—</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- New Medical Batch Modal -->
+<div class="modal-overlay" id="modal-new-batch" style="display:none;">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3>New Medical Batch</h3>
+            <button class="modal-close" id="btn-batch-cancel">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">Batch Name</label>
+                <input type="text" class="form-input" id="input-batch-name" placeholder="e.g. Drench - March 2026">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Treatment Type</label>
+                <select class="form-input" id="input-batch-type">
+                    <option value="Drench">Drench</option>
+                    <option value="Vaccine">Vaccine</option>
+                    <option value="Pour-on">Pour-on</option>
+                    <option value="Injectable">Injectable</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-outline btn-small" id="btn-batch-cancel-2">Cancel</button>
+            <button class="btn btn-save btn-small" id="btn-batch-save">Save Batch</button>
+        </div>
+    </div>
+</div>
+
+<!-- Scanner Toast Notification -->
+<div id="scan-toast" class="scan-toast" style="display:none;">
+    <span id="scan-toast-text"></span>
+</div>
+
+<script>
+// ── 1. Error diagnostics — show JS errors visually on-screen ──
+function _showError(msg) {
+    var d = document.getElementById('js-error-banner');
+    if (!d) {
+        d = document.createElement('div');
+        d.id = 'js-error-banner';
+        d.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#b91c1c;color:#fff;padding:12px 16px;font:13px/1.4 monospace;z-index:99999;max-height:40vh;overflow:auto;white-space:pre-wrap;';
+        document.body.insertBefore(d, document.body.firstChild);
+    }
+    d.innerHTML += msg + '\n';
+}
+window.onerror = function(msg, src, line) {
+    _showError('ERROR: ' + msg + ' (' + (src||'?') + ':' + line + ')');
+};
+window.addEventListener('unhandledrejection', function(e) {
+    var msg = e.reason ? (e.reason.message || String(e.reason)) : 'unknown';
+    // Suppress benign BLE command cancellations
+    if (msg.indexOf('Superseded') !== -1 || msg.indexOf('timed out') !== -1) {
+        e.preventDefault();
+        return;
+    }
+    _showError('REJECTION: ' + msg);
+});
+
+// ── 2. EventTarget polyfill (iOS 13 and older Safari) ──
+(function() {
+    try { new EventTarget(); } catch(e) {
+        console.log('[Polyfill] Patching EventTarget constructor');
+        var OldET = window.EventTarget;
+        window.EventTarget = function EventTarget() {
+            this.__listeners = {};
+        };
+        window.EventTarget.prototype.addEventListener = function(type, fn) {
+            if (!this.__listeners[type]) this.__listeners[type] = [];
+            this.__listeners[type].push(fn);
+        };
+        window.EventTarget.prototype.removeEventListener = function(type, fn) {
+            var a = this.__listeners[type];
+            if (a) this.__listeners[type] = a.filter(function(f) { return f !== fn; });
+        };
+        window.EventTarget.prototype.dispatchEvent = function(evt) {
+            var a = this.__listeners[evt.type];
+            if (a) a.slice().forEach(function(fn) { try { fn(evt); } catch(e) { console.error(e); } });
+            return true;
+        };
+    }
+})();
+
+// ── 3. Nuclear cache clear — wipe ALL old service workers + caches ──
+var APP_VERSION = 'v21';
+(function() {
+    // Auto-update the status bar with current version
+    var statusEl = document.getElementById('app-status-text');
+    if (statusEl) statusEl.textContent = APP_VERSION + ' | JS: loading...';
+    var stored = null;
+    try { stored = localStorage.getItem('ae_app_version'); } catch(e) {}
+    if (stored !== APP_VERSION) {
+        console.log('[Boot] Clearing caches (' + stored + ' -> ' + APP_VERSION + ')');
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(regs) {
+                regs.forEach(function(r) { r.unregister(); });
+            });
+        }
+        if ('caches' in window) {
+            caches.keys().then(function(keys) {
+                keys.forEach(function(k) { caches.delete(k); });
+            });
+        }
+        try { localStorage.setItem('ae_app_version', APP_VERSION); } catch(e) {}
+    }
+})();
+
+// ── 4. Module load check — detect if app.js failed to load ──
+window.__appLoaded = false;
+setTimeout(function() {
+    var el = document.getElementById('app-status-text');
+    if (!window.__appLoaded) {
+        if (el) el.textContent = APP_VERSION + ' | JS: FAILED — clear Safari data and reload';
+        var bar = document.getElementById('app-status');
+        if (bar) bar.style.background = '#b91c1c';
+        if (bar) bar.style.color = '#fff';
+        _showError('App failed to initialize after 5s.');
+    } else {
+        if (el) el.textContent = APP_VERSION + ' | JS: OK | BT: ' + (navigator.bluetooth ? 'yes' : 'no');
+    }
+}, 4000);
+</script>
+<script type="module" src="js/app.js?v=21"></script>
+<script>
+// ── 5. Service Worker registration ──
+if ('serviceWorker' in navigator) {
+    var refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function() {
+        if (!refreshing) { refreshing = true; window.location.reload(); }
+    });
+    window.addEventListener('load', function() {
+        navigator.serviceWorker.register('/sw.js')
+            .then(function(reg) {
+                console.log('[PWA] SW registered:', reg.scope);
+                setInterval(function() { reg.update(); }, 60000);
+            })
+            .catch(function(err) { console.warn('[PWA] SW failed:', err); });
+    });
+}
+</script>
+</body>
+</html>

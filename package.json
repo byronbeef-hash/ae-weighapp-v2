@@ -1,0 +1,9 @@
+{
+  "name": "agrieid-webapp",
+  "version": "1.0.0",
+  "description": "AgriEID - Livestock Weighing & EID Recording",
+  "scripts": {
+    "start": "npx http-server -p 8080 -c-1",
+    "dev": "npx http-server -p 8080 -c-1"
+  }
+}

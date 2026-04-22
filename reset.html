@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resetting...</title>
+    <style>
+        body { background: #0a0e14; color: #e6edf3; font-family: -apple-system, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .box { text-align: center; padding: 40px; max-width: 400px; }
+        h2 { color: #3fb950; }
+        #status { margin-top: 20px; font-size: 14px; color: #8b949e; line-height: 1.6; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h2>Clearing cache...</h2>
+        <div id="status">Please wait...</div>
+    </div>
+    <script>
+        var status = document.getElementById('status');
+        var log = [];
+
+        function setStatus(msg) {
+            log.push(msg);
+            status.textContent = msg;
+        }
+
+        async function reset() {
+            try {
+                // 1. Unregister ALL service workers
+                if ('serviceWorker' in navigator) {
+                    var regs = await navigator.serviceWorker.getRegistrations();
+                    setStatus('Removing ' + regs.length + ' service worker(s)...');
+                    for (var i = 0; i < regs.length; i++) {
+                        await regs[i].unregister();
+                    }
+                }
+
+                // 2. Delete ALL caches
+                if ('caches' in window) {
+                    var keys = await caches.keys();
+                    setStatus('Clearing ' + keys.length + ' cache(s)...');
+                    for (var i = 0; i < keys.length; i++) {
+                        await caches.delete(keys[i]);
+                    }
+                }
+
+                // 3. Clear ALL localStorage
+                try { localStorage.clear(); } catch(e) {}
+
+                // 4. Force-fetch all app files with cache: no-store to bust HTTP cache
+                setStatus('Fetching fresh files from server...');
+                var t = Date.now();
+                var files = [
+                    '/index.html?_=' + t,
+                    '/js/app.js?_=' + t,
+                    '/js/eid-reader.js?_=' + t,
+                    '/js/scales.js?_=' + t,
+                    '/js/supabase-sync.js?_=' + t,
+                    '/styles.css?_=' + t,
+                    '/sw.js?_=' + t,
+                ];
+                var fetched = 0;
+                for (var i = 0; i < files.length; i++) {
+                    try {
+                        await fetch(files[i], { cache: 'no-store' });
+                        fetched++;
+                    } catch(e) {
+                        // continue even if one fails
+                    }
+                }
+                setStatus('Fetched ' + fetched + '/' + files.length + ' files fresh');
+
+                // 5. Re-register the new service worker
+                if ('serviceWorker' in navigator) {
+                    setStatus('Registering new service worker...');
+                    try {
+                        await navigator.serviceWorker.register('/sw.js?_=' + t, { updateViaCache: 'none' });
+                    } catch(e) {
+                        setStatus('SW register: ' + e.message);
+                    }
+                }
+
+                // 6. Redirect
+                setStatus('Done! Redirecting to fresh app...');
+                setTimeout(function() {
+                    window.location.replace('/index.html?t=' + t);
+                }, 1500);
+
+            } catch(err) {
+                status.innerHTML = 'Error: ' + err.message + '<br><br>Log:<br>' + log.join('<br>');
+                setTimeout(function() {
+                    window.location.replace('/index.html?t=' + Date.now());
+                }, 3000);
+            }
+        }
+
+        reset();
+    </script>
+</body>
+</html>

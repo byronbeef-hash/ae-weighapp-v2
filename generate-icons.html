@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head><title>AgriEID Icon Generator</title></head>
+<body style="background:#1a1a1a; color:#fff; font-family:sans-serif; padding:40px;">
+<h2>AgriEID Icon Generator</h2>
+<p>Right-click each icon and "Save Image As" to the <code>icons/</code> folder.</p>
+<div id="icons" style="display:flex; gap:20px; flex-wrap:wrap; align-items:end;"></div>
+<script>
+const sizes = [72, 96, 128, 144, 152, 192, 384, 512];
+
+function drawIcon(size) {
+    const c = document.createElement('canvas');
+    c.width = size; c.height = size;
+    const ctx = c.getContext('2d');
+    const s = size / 512;
+
+    // Background
+    const bgGrad = ctx.createLinearGradient(0, 0, size, size);
+    bgGrad.addColorStop(0, '#0d1117');
+    bgGrad.addColorStop(1, '#161b22');
+    roundRect(ctx, 0, 0, size, size, 96 * s, bgGrad);
+
+    // Border
+    ctx.strokeStyle = '#3fb950';
+    ctx.globalAlpha = 0.5;
+    ctx.lineWidth = 4 * s;
+    roundRectStroke(ctx, 8*s, 8*s, size-16*s, size-16*s, 88*s);
+    ctx.globalAlpha = 1;
+
+    // Scale platform
+    ctx.fillStyle = '#3fb950';
+    roundRect(ctx, (256-80)*s, 180*s, 160*s, 12*s, 6*s, '#3fb950');
+
+    // Scale base
+    ctx.globalAlpha = 0.7;
+    roundRect(ctx, (256-20)*s, 192*s, 40*s, 40*s, 4*s, '#3fb950');
+    ctx.globalAlpha = 1;
+
+    // Weight lines
+    ctx.globalAlpha = 0.4;
+    roundRect(ctx, (256-60)*s, 150*s, 120*s, 8*s, 4*s, '#3fb950');
+    ctx.globalAlpha = 0.3;
+    roundRect(ctx, (256-40)*s, 132*s, 80*s, 8*s, 4*s, '#3fb950');
+    ctx.globalAlpha = 1;
+
+    // "Agri" text
+    ctx.fillStyle = '#e6edf3';
+    ctx.font = `800 ${72*s}px "SF Pro Display", "Segoe UI", Arial, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText('Agri', 256*s, 310*s);
+
+    // "EID" text
+    ctx.fillStyle = '#3fb950';
+    ctx.font = `800 ${80*s}px "SF Pro Display", "Segoe UI", Arial, sans-serif`;
+    ctx.fillText('EID', 256*s, 385*s);
+
+    // RFID tag
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = '#3fb950';
+    roundRect(ctx, (256-30)*s, 432*s, 60*s, 16*s, 4*s, '#3fb950');
+    ctx.fillStyle = '#0d1117';
+    ctx.beginPath();
+    ctx.arc((256-18)*s, 440*s, 3*s, 0, Math.PI*2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    return c;
+}
+
+function roundRect(ctx, x, y, w, h, r, fill) {
+    ctx.beginPath();
+    ctx.moveTo(x+r, y);
+    ctx.lineTo(x+w-r, y); ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+    ctx.lineTo(x+w, y+h-r); ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+    ctx.lineTo(x+r, y+h); ctx.quadraticCurveTo(x, y+h, x, y+h-r);
+    ctx.lineTo(x, y+r); ctx.quadraticCurveTo(x, y, x+r, y);
+    ctx.closePath();
+    if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+}
+
+function roundRectStroke(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x+r, y);
+    ctx.lineTo(x+w-r, y); ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+    ctx.lineTo(x+w, y+h-r); ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+    ctx.lineTo(x+r, y+h); ctx.quadraticCurveTo(x, y+h, x, y+h-r);
+    ctx.lineTo(x, y+r); ctx.quadraticCurveTo(x, y, x+r, y);
+    ctx.closePath();
+    ctx.stroke();
+}
+
+const container = document.getElementById('icons');
+sizes.forEach(size => {
+    const canvas = drawIcon(size);
+    const div = document.createElement('div');
+    div.style.textAlign = 'center';
+    div.innerHTML = `<p>icon-${size}.png</p>`;
+    div.appendChild(canvas);
+
+    // Auto-download link
+    const link = document.createElement('a');
+    link.download = `icon-${size}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.textContent = `Download ${size}x${size}`;
+    link.style.cssText = 'display:block; color:#3fb950; margin-top:8px;';
+    div.appendChild(link);
+
+    container.appendChild(div);
+});
+</script>
+</body>
+</html>

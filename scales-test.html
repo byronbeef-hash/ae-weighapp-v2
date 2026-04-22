@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgriEID — Scales Data Stream Tester</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0d1117;
+            color: #e6edf3;
+            padding: 16px;
+            min-height: 100vh;
+        }
+        h1 { font-size: 18px; color: #3fb950; margin-bottom: 4px; }
+        .subtitle { font-size: 12px; color: rgba(255,255,255,0.5); margin-bottom: 16px; }
+        .controls { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+        button {
+            padding: 12px 20px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            background: #161b22;
+            color: #fff;
+            font-family: inherit;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        button:active { transform: scale(0.97); }
+        .btn-connect { border-color: #3fb950; color: #3fb950; }
+        .btn-connect.connected { background: #3fb950; color: #000; }
+        .btn-disconnect { border-color: #f85149; color: #f85149; }
+        .btn-clear { border-color: #58a6ff; color: #58a6ff; }
+        .btn-copy { border-color: #f0883e; color: #f0883e; }
+        .btn-save { border-color: #a371f7; color: #a371f7; }
+
+        .status { padding: 8px 12px; border-radius: 6px; background: #161b22; border: 1px solid rgba(255,255,255,0.1); margin-bottom: 12px; font-size: 13px; }
+        .status .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #f85149; margin-right: 6px; }
+        .status .dot.on { background: #3fb950; }
+
+        .weight-big {
+            font-size: 64px;
+            font-weight: 900;
+            text-align: center;
+            padding: 20px;
+            color: #3fb950;
+            background: #0d1117;
+            border: 2px solid rgba(63,185,80,0.3);
+            border-radius: 16px;
+            margin-bottom: 12px;
+            transition: color 0.3s, border-color 0.3s;
+        }
+        .weight-big.dynamic { color: #f0883e; border-color: rgba(240,136,62,0.3); }
+        .weight-big.disconnected { color: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.1); }
+
+        .parsed-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .info-card {
+            background: #161b22;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 8px 10px;
+        }
+        .info-card .label { font-size: 10px; text-transform: uppercase; color: rgba(255,255,255,0.4); letter-spacing: 1px; }
+        .info-card .value { font-size: 16px; font-weight: bold; color: #58a6ff; margin-top: 2px; }
+        .info-card .value.green { color: #3fb950; }
+        .info-card .value.orange { color: #f0883e; }
+        .info-card .value.red { color: #f85149; }
+
+        .section-title { font-size: 13px; color: #3fb950; margin: 16px 0 8px; text-transform: uppercase; letter-spacing: 1px; }
+
+        .log {
+            background: #0d1117;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 8px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-size: 11px;
+            line-height: 1.6;
+        }
+        .log-entry { border-bottom: 1px solid rgba(255,255,255,0.05); padding: 4px 0; }
+        .log-entry:last-child { border-bottom: none; }
+        .log-entry .frame-num { color: rgba(255,255,255,0.3); }
+        .log-entry .hex { color: #58a6ff; word-break: break-all; }
+        .log-entry .ascii { color: #f0883e; }
+        .log-entry .parsed { color: #3fb950; }
+        .log-entry .warn { color: #f85149; }
+
+        .snapshot-section { margin-top: 16px; }
+        .snapshot-list { display: flex; flex-direction: column; gap: 8px; }
+        .snapshot-item {
+            background: #161b22;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 10px;
+            font-size: 11px;
+        }
+        .snapshot-item .snap-label { font-weight: bold; color: #a371f7; margin-bottom: 4px; }
+        .snapshot-item .snap-data { color: #58a6ff; word-break: break-all; }
+
+        .compare-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+        .compare-table th {
+            text-align: left;
+            padding: 6px 8px;
+            background: #161b22;
+            color: rgba(255,255,255,0.6);
+            border: 1px solid rgba(255,255,255,0.1);
+            font-size: 10px;
+            text-transform: uppercase;
+        }
+        .compare-table td {
+            padding: 6px 8px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .compare-table .diff { background: rgba(248,81,73,0.15); color: #f85149; }
+        .compare-table .same { color: rgba(255,255,255,0.4); }
+
+        @media (max-width: 500px) {
+            .weight-big { font-size: 48px; }
+            .parsed-info { grid-template-columns: 1fr 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<h1>AgriEID Scales Data Stream Tester</h1>
+<p class="subtitle">Connect indicators one at a time. Save a snapshot of each to compare.</p>
+
+<div class="controls">
+    <button class="btn-connect" id="btn-connect" onclick="connectScales()">Connect Scales</button>
+    <button class="btn-disconnect" id="btn-disconnect" onclick="disconnectScales()" style="display:none">Disconnect</button>
+    <button class="btn-save" onclick="saveSnapshot('2T')" style="border-color:#3fb950;color:#3fb950">Save as 2T</button>
+    <button class="btn-save" onclick="saveSnapshot('5T')" style="border-color:#f0883e;color:#f0883e">Save as 5T</button>
+    <button class="btn-copy" onclick="copyLog()">Copy Log</button>
+    <button class="btn-clear" onclick="clearLog()">Clear Log</button>
+</div>
+
+<div class="status" id="status"><span class="dot" id="status-dot"></span> <span id="status-text">Disconnected</span></div>
+
+<div class="weight-big disconnected" id="weight-display">--- kg</div>
+
+<div class="parsed-info" id="parsed-info">
+    <div class="info-card"><div class="label">Status A (hex)</div><div class="value" id="val-statusA">--</div></div>
+    <div class="info-card"><div class="label">Status B (hex)</div><div class="value" id="val-statusB">--</div></div>
+    <div class="info-card"><div class="label">DP Bits (0-2)</div><div class="value" id="val-dpBits">--</div></div>
+    <div class="info-card"><div class="label">Decimal Places</div><div class="value green" id="val-dp">--</div></div>
+    <div class="info-card"><div class="label">Weight String (raw)</div><div class="value orange" id="val-weightStr">--</div></div>
+    <div class="info-card"><div class="label">Weight Raw Int</div><div class="value" id="val-weightRaw">--</div></div>
+    <div class="info-card"><div class="label">Parsed Weight</div><div class="value green" id="val-weight">--</div></div>
+    <div class="info-card"><div class="label">Has Decimal In String</div><div class="value" id="val-hasDot">--</div></div>
+    <div class="info-card"><div class="label">Steady / Dynamic</div><div class="value" id="val-steady">--</div></div>
+    <div class="info-card"><div class="label">Net / Gross</div><div class="value" id="val-netgross">--</div></div>
+    <div class="info-card"><div class="label">Unit</div><div class="value" id="val-unit">--</div></div>
+    <div class="info-card"><div class="label">Sanity Override</div><div class="value" id="val-sanity">--</div></div>
+</div>
+
+<div class="section-title">Raw Frame Log (latest first)</div>
+<div class="log" id="log"><div style="color:rgba(255,255,255,0.3)">Connect an indicator to see frames...</div></div>
+
+<div class="snapshot-section">
+    <div class="section-title">Saved Snapshots (for comparison)</div>
+    <div class="snapshot-list" id="snapshots"></div>
+</div>
+
+<div id="compare-section" style="display:none">
+    <div class="section-title">Comparison</div>
+    <table class="compare-table" id="compare-table"></table>
+</div>
+
+<script>
+// ===== Scales BLE Connection (same protocol as main app) =====
+const STX = 0x02;
+const CR = 0x0D;
+const FRAME_LENGTH = 18;
+
+let device = null;
+let buffer = [];
+let frameCount = 0;
+let frames = [];
+let currentParsed = null;
+
+const $ = id => document.getElementById(id);
+
+const SCALES_SERVICE = '49535343-fe7d-4ae5-8fa9-9fafd205e455';
+const SCALES_TX_CHAR = '49535343-1e4d-4bd9-ba61-23c647249616';
+
+async function connectScales() {
+    try {
+        device = await navigator.bluetooth.requestDevice({
+            filters: [{ namePrefix: 'AgriEID' }],
+            optionalServices: [SCALES_SERVICE]
+        });
+
+        $('status-text').textContent = 'Connecting to ' + (device.name || 'scales') + '...';
+
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService(SCALES_SERVICE);
+        const char = await service.getCharacteristic(SCALES_TX_CHAR);
+
+        await char.startNotifications();
+        char.addEventListener('characteristicvaluechanged', onData);
+
+        device.addEventListener('gattserverdisconnected', () => {
+            setConnected(false);
+        });
+
+        setConnected(true, device.name);
+        buffer = [];
+        frameCount = 0;
+    } catch (e) {
+        $('status-text').textContent = 'Error: ' + e.message;
+    }
+}
+
+function disconnectScales() {
+    if (device?.gatt?.connected) device.gatt.disconnect();
+    device = null;
+    setConnected(false);
+}
+
+function setConnected(on, name) {
+    $('status-dot').className = 'dot' + (on ? ' on' : '');
+    $('status-text').textContent = on ? 'Connected: ' + (name || 'AGU9i') : 'Disconnected';
+    $('btn-connect').style.display = on ? 'none' : '';
+    $('btn-disconnect').style.display = on ? '' : 'none';
+    if (on) {
+        $('btn-connect').classList.add('connected');
+        $('weight-display').className = 'weight-big';
+    } else {
+        $('btn-connect').classList.remove('connected');
+        $('weight-display').className = 'weight-big disconnected';
+        $('weight-display').textContent = '--- kg';
+    }
+}
+
+function onData(event) {
+    const data = new Uint8Array(event.target.value.buffer);
+    for (const byte of data) buffer.push(byte);
+
+    while (buffer.length >= FRAME_LENGTH) {
+        const stxIndex = buffer.indexOf(STX);
+        if (stxIndex === -1) { buffer = []; return; }
+        if (stxIndex > 0) buffer = buffer.slice(stxIndex);
+        if (buffer.length < FRAME_LENGTH) return;
+
+        const frame = buffer.slice(0, FRAME_LENGTH);
+        buffer = buffer.slice(FRAME_LENGTH);
+
+        if (frame[16] !== CR) continue;
+
+        parseFrame(frame);
+    }
+}
+
+function parseFrame(frame) {
+    frameCount++;
+    const statusA = frame[1];
+    const statusB = frame[2];
+    const statusC = frame[3];
+
+    // Extract weight digits (bytes 5-10, index 4-9) as ASCII
+    let weightStr = '';
+    for (let i = 4; i <= 9; i++) weightStr += String.fromCharCode(frame[i]);
+
+    // Extract tare digits
+    let tareStr = '';
+    for (let i = 10; i <= 15; i++) tareStr += String.fromCharCode(frame[i]);
+
+    // Status B flags
+    const isNet = (statusB & 0x01) !== 0;
+    const isNegative = (statusB & 0x02) !== 0;
+    const isHighRes = (statusB & 0x04) !== 0;
+    const isDynamic = (statusB & 0x08) !== 0;
+    const isKg = (statusB & 0x10) !== 0;
+
+    // Decimal point bits
+    const dpBits = statusA & 0x07;
+    const hasDecimalInString = weightStr.includes('.');
+
+    let weight, tare, decimalPlaces, sanityOverride = false;
+
+    if (hasDecimalInString) {
+        weight = parseFloat(weightStr) || 0;
+        tare = parseFloat(tareStr) || 0;
+        const parts = weightStr.trim().split('.');
+        decimalPlaces = parts.length > 1 ? parts[1].replace(/\s/g, '').length : 0;
+    } else {
+        switch (dpBits) {
+            case 0: decimalPlaces = 0; break;
+            case 1: decimalPlaces = 1; break;
+            case 2: decimalPlaces = 2; break;
+            case 4: decimalPlaces = 3; break;
+            default: decimalPlaces = 1;
+        }
+
+        let weightRaw = parseInt(weightStr.replace(/\s/g, ''), 10) || 0;
+        let tareRaw = parseInt(tareStr.replace(/\s/g, ''), 10) || 0;
+
+        weight = weightRaw / Math.pow(10, decimalPlaces);
+        tare = tareRaw / Math.pow(10, decimalPlaces);
+
+        // Sanity check
+        if (decimalPlaces > 0 && weightRaw > 100 && weight < 20) {
+            sanityOverride = true;
+            decimalPlaces = 0;
+            weight = weightRaw;
+            tare = tareRaw;
+        }
+    }
+
+    if (isNegative) weight = -weight;
+
+    const rawHex = Array.from(frame).map(b => b.toString(16).padStart(2, '0')).join(' ');
+    const rawBytes = Array.from(frame);
+
+    const parsed = {
+        frameNum: frameCount,
+        statusA, statusB, statusC,
+        statusAHex: '0x' + statusA.toString(16).padStart(2, '0'),
+        statusBHex: '0x' + statusB.toString(16).padStart(2, '0'),
+        dpBits,
+        decimalPlaces,
+        weightStr: weightStr,
+        weightRaw: parseInt(weightStr.replace(/\s/g, ''), 10) || 0,
+        weight,
+        weightDisplay: weight.toFixed(decimalPlaces),
+        tare,
+        tareStr,
+        hasDecimalInString,
+        sanityOverride,
+        isNet, isNegative, isHighRes, isDynamic, isKg,
+        unit: isKg ? 'kg' : 'lb',
+        rawHex,
+        rawBytes,
+        timestamp: new Date().toISOString()
+    };
+
+    currentParsed = parsed;
+    frames.push(parsed);
+
+    // Update display
+    const wd = $('weight-display');
+    wd.textContent = parsed.weightDisplay + ' ' + parsed.unit;
+    wd.className = 'weight-big' + (isDynamic ? ' dynamic' : '');
+
+    // Update info cards
+    $('val-statusA').textContent = parsed.statusAHex + ' (' + statusA.toString(2).padStart(8, '0') + ')';
+    $('val-statusB').textContent = parsed.statusBHex + ' (' + statusB.toString(2).padStart(8, '0') + ')';
+    $('val-dpBits').textContent = dpBits + ' (bits: ' + (dpBits).toString(2).padStart(3, '0') + ')';
+    $('val-dp').textContent = decimalPlaces;
+    $('val-weightStr').textContent = '"' + weightStr + '"';
+    $('val-weightRaw').textContent = parsed.weightRaw;
+    $('val-weight').textContent = parsed.weightDisplay + ' ' + parsed.unit;
+    $('val-hasDot').textContent = hasDecimalInString ? 'YES' : 'NO';
+    $('val-steady').textContent = isDynamic ? 'DYNAMIC' : 'STEADY';
+    $('val-steady').className = 'value ' + (isDynamic ? 'orange' : 'green');
+    $('val-netgross').textContent = isNet ? 'Net' : 'Gross';
+    $('val-unit').textContent = parsed.unit;
+    $('val-sanity').textContent = sanityOverride ? 'YES — dp forced to 0' : 'No';
+    $('val-sanity').className = 'value ' + (sanityOverride ? 'red' : 'same');
+
+    // Add to log (latest first, keep last 200)
+    addLogEntry(parsed);
+}
+
+function addLogEntry(p) {
+    const log = $('log');
+    if (frameCount === 1) log.innerHTML = '';
+
+    const entry = document.createElement('div');
+    entry.className = 'log-entry';
+    entry.innerHTML = `<span class="frame-num">#${p.frameNum}</span> ` +
+        `<span class="hex">${p.rawHex}</span><br>` +
+        `<span class="ascii">weightStr="${p.weightStr}" tareStr="${p.tareStr}"</span> ` +
+        `<span class="parsed">→ ${p.weightDisplay} ${p.unit} (dp=${p.decimalPlaces}, dpBits=${p.dpBits}, raw=${p.weightRaw})</span>` +
+        `${p.sanityOverride ? ' <span class="warn">⚠ SANITY OVERRIDE</span>' : ''}` +
+        ` | A=${p.statusAHex} B=${p.statusBHex} | ${p.isDynamic ? 'DYNAMIC' : 'STEADY'}`;
+
+    log.insertBefore(entry, log.firstChild);
+
+    // Trim to 200 entries
+    while (log.children.length > 200) log.removeChild(log.lastChild);
+}
+
+// ===== Snapshots =====
+let snapshots = [];
+
+function saveSnapshot(label) {
+    if (!currentParsed) { alert('Connect scales and get a reading first'); return; }
+
+    const name = label ? label + ' Indicator' + (device?.name ? ' (' + device.name + ')' : '') : prompt('Label this snapshot:', 'Indicator ' + (snapshots.length + 1));
+    if (!name) return;
+
+    const snap = {
+        name,
+        sample: { ...currentParsed },
+        frameCount,
+        totalFrames: frames.length,
+        savedAt: new Date().toISOString()
+    };
+    snapshots.push(snap);
+    renderSnapshots();
+}
+
+function renderSnapshots() {
+    const container = $('snapshots');
+    container.innerHTML = '';
+
+    for (const snap of snapshots) {
+        const div = document.createElement('div');
+        div.className = 'snapshot-item';
+        const p = snap.sample;
+        div.innerHTML = `
+            <div class="snap-label">${snap.name} — saved at ${new Date(snap.savedAt).toLocaleTimeString()}</div>
+            <div class="snap-data">
+                Weight: <strong>${p.weightDisplay} ${p.unit}</strong> | Raw: "${p.weightStr}" (int: ${p.weightRaw})<br>
+                StatusA: ${p.statusAHex} | StatusB: ${p.statusBHex} | dpBits: ${p.dpBits} → dp: ${p.decimalPlaces}<br>
+                Has decimal in string: ${p.hasDecimalInString} | Sanity override: ${p.sanityOverride}<br>
+                ${p.isDynamic ? 'DYNAMIC' : 'STEADY'} | ${p.isNet ? 'Net' : 'Gross'} | ${p.unit}<br>
+                Hex: <span style="color:#58a6ff;font-size:10px">${p.rawHex}</span>
+            </div>
+        `;
+        container.appendChild(div);
+    }
+
+    // Compare if 2+ snapshots
+    if (snapshots.length >= 2) {
+        renderComparison();
+    }
+}
+
+function renderComparison() {
+    const section = $('compare-section');
+    section.style.display = '';
+    const table = $('compare-table');
+
+    const fields = [
+        ['Weight Display', 'weightDisplay'],
+        ['Raw Weight String', 'weightStr'],
+        ['Weight Raw Int', 'weightRaw'],
+        ['Status A (hex)', 'statusAHex'],
+        ['Status B (hex)', 'statusBHex'],
+        ['DP Bits', 'dpBits'],
+        ['Decimal Places', 'decimalPlaces'],
+        ['Has Decimal In String', 'hasDecimalInString'],
+        ['Sanity Override', 'sanityOverride'],
+        ['Dynamic/Steady', d => d.isDynamic ? 'DYNAMIC' : 'STEADY'],
+        ['Net/Gross', d => d.isNet ? 'Net' : 'Gross'],
+        ['Unit', 'unit'],
+        ['Raw Hex', 'rawHex'],
+    ];
+
+    let html = '<tr><th>Field</th>';
+    for (const s of snapshots) html += `<th>${s.name}</th>`;
+    html += '</tr>';
+
+    for (const [label, key] of fields) {
+        html += `<tr><td>${label}</td>`;
+        const values = snapshots.map(s => typeof key === 'function' ? key(s.sample) : s.sample[key]);
+        const allSame = values.every(v => String(v) === String(values[0]));
+        for (const v of values) {
+            const cls = allSame ? 'same' : 'diff';
+            html += `<td class="${cls}">${v}</td>`;
+        }
+        html += '</tr>';
+    }
+
+    table.innerHTML = html;
+}
+
+// ===== Utilities =====
+function clearLog() {
+    $('log').innerHTML = '<div style="color:rgba(255,255,255,0.3)">Log cleared.</div>';
+    frames = [];
+    frameCount = 0;
+}
+
+function copyLog() {
+    const data = {
+        snapshots,
+        recentFrames: frames.slice(-20).map(f => ({
+            frameNum: f.frameNum,
+            rawHex: f.rawHex,
+            weightStr: f.weightStr,
+            weightRaw: f.weightRaw,
+            weightDisplay: f.weightDisplay,
+            statusAHex: f.statusAHex,
+            statusBHex: f.statusBHex,
+            dpBits: f.dpBits,
+            decimalPlaces: f.decimalPlaces,
+            hasDecimalInString: f.hasDecimalInString,
+            sanityOverride: f.sanityOverride,
+            isDynamic: f.isDynamic,
+            unit: f.unit,
+            timestamp: f.timestamp
+        })),
+        totalFrames: frames.length,
+        exportedAt: new Date().toISOString()
+    };
+
+    const text = JSON.stringify(data, null, 2);
+
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(() => alert('Copied to clipboard!'));
+    } else {
+        // Fallback
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        alert('Copied to clipboard!');
+    }
+}
+</script>
+</body>
+</html>
