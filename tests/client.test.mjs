@@ -62,6 +62,26 @@ assert(activeEids.size === active.length, 'active EIDs are unique');
 console.log(`     ${active.length} active / ${records.length} total animals, ${history.length} history events`);
 console.log(`     first 3 EIDs: ${records.slice(0,3).map(r => r.eid).join(', ')}`);
 
+// [2b] Profile + medical accessors populated
+console.log('\n[2b] Profile + medical accessors');
+const breeds = lp.getCloudBreeds();
+const mBatches = lp.getCloudMedicalBatches();
+const bProducts = lp.getCloudBatchProducts();
+const mProducts = lp.getCloudProducts();
+assert(breeds.length > 0, 'getCloudBreeds() returns breeds');
+assert(mBatches.length > 0, 'getCloudMedicalBatches() returns batches');
+assert(bProducts.length > 0, 'getCloudBatchProducts() returns batch products');
+assert(mProducts.length > 0, 'getCloudProducts() returns products');
+console.log(`     breeds=${breeds.length} batches=${mBatches.length} batchProducts=${bProducts.length} products=${mProducts.length}`);
+
+// Verify at least some animals have profile fields the UI needs
+const withDob = records.filter(r => r.date_of_birth).length;
+const withSex = records.filter(r => r.sex).length;
+const withImage = records.filter(r => r.image && !String(r.image).includes('livestock_default_photo')).length;
+const withBatch = records.filter(r => r.medical_batch_uuid).length;
+assert(withSex > 0 || withDob > 0 || withBatch > 0, 'records carry profile fields (sex/dob/batch)', `sex=${withSex} dob=${withDob} batch=${withBatch}`);
+console.log(`     profile coverage: dob=${withDob} sex=${withSex} image=${withImage} medical_batch=${withBatch}`);
+
 // [3] Stale-date resilience: seed stale state, re-login, verify wipe
 console.log('\n[3] Stale last_sync_date from previous user is wiped on login');
 localStorage.setItem('agrieid_lp_last_sync', new Date().toISOString());

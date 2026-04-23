@@ -3415,6 +3415,7 @@ function buildAnimalIndex() {
                 latestWeight: 0,
                 latestDate: null,
                 recordCount: 0,
+                profile: {},
             });
         }
         const animal = animals.get(eid);
@@ -3424,6 +3425,18 @@ function buildAnimalIndex() {
         });
         // Keep latest VID
         if (record.vid) animal.vid = record.vid;
+        // Merge profile fields (prefer non-null values from any source)
+        const p = animal.profile;
+        const fields = ['image','date_of_birth','sex','breeds_uuid','condition',
+            'is_pregnant','is_dehorn','mother_visual_tag','father_visual_tag',
+            'weaned_date','desex_date','pregnant_date','dehorned_date',
+            'date_of_sale','date_of_death','date_of_purchase','purchase_price',
+            'adg_kg','medical_batch_uuid','notes','age'];
+        for (const f of fields) {
+            if (record[f] != null && record[f] !== '' && p[f] == null) {
+                p[f] = record[f];
+            }
+        }
     }
 
     // 1. Local per-session storage (agrieid_session_{id})
@@ -3473,6 +3486,26 @@ function buildAnimalIndex() {
                 date: (cr.record_date || cr.updated_at || '').split(' ')[0].split('T')[0],
                 timestamp: cr.updated_at || cr.created_at || new Date().toISOString(),
                 lpSynced: true,
+                image: cr.image || null,
+                date_of_birth: cr.date_of_birth,
+                sex: cr.sex,
+                breeds_uuid: cr.breeds_uuid,
+                condition: cr.condition,
+                is_pregnant: cr.is_pregnant,
+                is_dehorn: cr.is_dehorn,
+                mother_visual_tag: cr.mother_visual_tag,
+                father_visual_tag: cr.father_visual_tag,
+                weaned_date: cr.weaned_date,
+                desex_date: cr.desex_date,
+                pregnant_date: cr.pregnant_date,
+                dehorned_date: cr.dehorned_date,
+                date_of_sale: cr.date_of_sale,
+                date_of_death: cr.date_of_death,
+                date_of_purchase: cr.date_of_purchase,
+                purchase_price: cr.purchase_price,
+                adg_kg: cr.adg_kg,
+                medical_batch_uuid: cr.medical_batch_uuid,
+                age: cr.age,
             }, 'Cloud Register');
         }
     } catch { /* skip */ }
@@ -3493,6 +3526,17 @@ function buildAnimalIndex() {
                 date: (h.record_date || h.created_at || '').split(' ')[0].split('T')[0],
                 timestamp: h.created_at || new Date().toISOString(),
                 lpSynced: true,
+                medical_batch_uuid: h.medical_batch_uuid,
+                medical_batch_name: h.medical_batch_name,
+                log_type: h.log_type,
+                weight_changed: h.weight_changed,
+                image: h.image && !h.image.includes('livestock_default_photo') ? h.image : null,
+                date_of_birth: h.date_of_birth,
+                sex: h.sex,
+                breeds_uuid: h.breeds_uuid,
+                condition: h.condition,
+                is_pregnant: h.is_pregnant,
+                adg_kg: h.adg_kg,
             }, 'History');
         }
     } catch { /* skip */ }
@@ -3644,6 +3688,10 @@ function showAnimalDetail(eid) {
         title.textContent = animal.vid ? `${animal.eid} — ${animal.vid}` : animal.eid;
     }
 
+    // Render profile (photo + fields + medical treatments)
+    renderAnimalProfile(animal);
+    renderAnimalMedical(animal);
+
     // Stats
     const records = animal.records;
     const last = records[records.length - 1];
@@ -3717,6 +3765,153 @@ function showAnimalDetail(eid) {
     }
 
     showScreen('animal-detail');
+}
+
+function renderAnimalProfile(animal) {
+    const p = animal.profile || {};
+    const photoEl = $('animal-profile-photo');
+    const placeholderEl = $('animal-profile-photo-placeholder');
+    const fieldsEl = $('animal-profile-fields');
+
+    // Photo (skip the LP default placeholder image)
+    const isPlaceholder = p.image && String(p.image).includes('livestock_default_photo');
+    if (photoEl && placeholderEl) {
+        if (p.image && !isPlaceholder) {
+            photoEl.src = p.image;
+            photoEl.hidden = false;
+            placeholderEl.hidden = true;
+            photoEl.onerror = () => { photoEl.hidden = true; placeholderEl.hidden = false; };
+        } else {
+            photoEl.hidden = true;
+            photoEl.removeAttribute('src');
+            placeholderEl.hidden = false;
+        }
+    }
+
+    // Breed lookup
+    let breedName = '';
+    if (p.breeds_uuid) {
+        try {
+            const breeds = lpSync.getCloudBreeds ? lpSync.getCloudBreeds() : [];
+            breedName = breeds.find(b => b.uuid === p.breeds_uuid)?.name || '';
+        } catch { /* skip */ }
+    }
+
+    const fmtDate = (d) => {
+        if (!d) return '';
+        const dt = new Date(String(d).replace(' ', 'T'));
+        return isNaN(dt.getTime()) ? '' : formatShortDate(dt);
+    };
+    const ageFromDob = (dob) => {
+        if (!dob) return '';
+        const dt = new Date(String(dob).replace(' ', 'T'));
+        if (isNaN(dt.getTime())) return '';
+        const months = Math.floor((Date.now() - dt.getTime()) / (1000 * 60 * 60 * 24 * 30.44));
+        if (months < 24) return `${months} mo`;
+        return `${Math.floor(months / 12)}y ${months % 12}m`;
+    };
+    const sexLabel = (s) => ({F:'Female',M:'Male',S:'Steer',H:'Heifer',B:'Bull',C:'Cow'}[s] || s || '');
+    const yesNo = (v) => v === 1 || v === '1' || v === true ? 'Yes' : '';
+
+    const fields = [
+        ['EID', animal.eid],
+        ['VID', animal.vid],
+        ['Sex', sexLabel(p.sex)],
+        ['Breed', breedName],
+        ['Date of birth', fmtDate(p.date_of_birth)],
+        ['Age', ageFromDob(p.date_of_birth)],
+        ['Condition score', p.condition],
+        ['Pregnant', yesNo(p.is_pregnant)],
+        ['Dehorned', yesNo(p.is_dehorn)],
+        ['Weaned', fmtDate(p.weaned_date)],
+        ['Sire (VID)', p.father_visual_tag],
+        ['Dam (VID)', p.mother_visual_tag],
+        ['Purchased', fmtDate(p.date_of_purchase)],
+        ['Purchase price', p.purchase_price ? '$' + p.purchase_price : ''],
+        ['Sold', fmtDate(p.date_of_sale)],
+        ['Deceased', fmtDate(p.date_of_death)],
+        ['ADG (kg/day)', p.adg_kg],
+        ['Notes', p.notes],
+    ].filter(([, v]) => v != null && v !== '');
+
+    if (!fieldsEl) return;
+    if (fields.length === 0) {
+        fieldsEl.innerHTML = '<div class="dashboard-empty">No profile data yet.</div>';
+        return;
+    }
+    fieldsEl.innerHTML = fields.map(([label, value]) =>
+        `<div class="animal-profile-field">
+            <div class="animal-profile-field-label">${escapeHtml(label)}</div>
+            <div class="animal-profile-field-value">${escapeHtml(String(value))}</div>
+        </div>`
+    ).join('');
+}
+
+function renderAnimalMedical(animal) {
+    const listEl = $('animal-medical-list');
+    if (!listEl) return;
+
+    const batches = lpSync.getCloudMedicalBatches ? lpSync.getCloudMedicalBatches() : [];
+    const batchProducts = lpSync.getCloudBatchProducts ? lpSync.getCloudBatchProducts() : [];
+    const products = lpSync.getCloudProducts ? lpSync.getCloudProducts() : [];
+    const batchMap = new Map(batches.map(b => [b.uuid, b]));
+    const productMap = new Map(products.map(p => [p.id, p]));
+    const productsByBatch = new Map();
+    for (const bp of batchProducts) {
+        if (!productsByBatch.has(bp.medical_batch_uuid)) productsByBatch.set(bp.medical_batch_uuid, []);
+        productsByBatch.get(bp.medical_batch_uuid).push(bp);
+    }
+
+    // Collect unique (batch_uuid, date) pairs from animal records
+    const seen = new Set();
+    const treatments = [];
+    for (const r of animal.records) {
+        const uuid = r.medical_batch_uuid;
+        if (!uuid || !batchMap.has(uuid)) continue;
+        const dateKey = r.date || r.timestamp || '';
+        const key = uuid + '|' + dateKey;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        treatments.push({ batch: batchMap.get(uuid), date: dateKey, notes: r.notes || '' });
+    }
+
+    // Also include the animal's primary batch if set in profile
+    const primaryUuid = animal.profile?.medical_batch_uuid;
+    if (primaryUuid && batchMap.has(primaryUuid) && !treatments.some(t => t.batch.uuid === primaryUuid)) {
+        treatments.push({ batch: batchMap.get(primaryUuid), date: '', notes: '' });
+    }
+
+    treatments.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+    if (treatments.length === 0) {
+        listEl.innerHTML = '<div class="dashboard-empty">No medical treatments recorded.</div>';
+        return;
+    }
+
+    listEl.innerHTML = treatments.map(t => {
+        const bps = productsByBatch.get(t.batch.uuid) || [];
+        const productLines = bps.map(bp => {
+            const prod = productMap.get(bp.product_id);
+            const name = prod?.name || prod?.product_name || `Product #${bp.product_id}`;
+            const dose = bp.dosage ? ` · ${escapeHtml(bp.dosage)}` : '';
+            return `<div class="animal-medical-product">${escapeHtml(name)}${dose}</div>`;
+        }).join('');
+        const dateStr = t.date ? formatShortDate(new Date(String(t.date).replace(' ', 'T'))) : '';
+        return `<div class="animal-medical-row">
+            <div class="animal-medical-main">
+                <span class="animal-medical-batch">${escapeHtml(t.batch.batch_no || 'Batch')}</span>
+                ${dateStr ? `<span class="animal-medical-date">${dateStr}</span>` : ''}
+            </div>
+            ${productLines ? `<div class="animal-medical-products">${productLines}</div>` : ''}
+            ${t.notes ? `<div class="animal-medical-notes">${escapeHtml(t.notes)}</div>` : ''}
+        </div>`;
+    }).join('');
+}
+
+function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[c]));
 }
 
 /**

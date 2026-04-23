@@ -9,6 +9,9 @@ const LP_LAST_SYNC_KEY = 'agrieid_lp_last_sync';
 const LP_FARM_UUID_KEY = 'agrieid_lp_farm_uuid';
 const LP_RECORDS_KEY = 'agrieid_lp_records';
 const LP_RECORD_HISTORY_KEY = 'agrieid_lp_record_history';
+const LP_BREEDS_KEY = 'agrieid_lp_breeds';
+const LP_BATCH_PRODUCTS_KEY = 'agrieid_lp_batch_products';
+const LP_PRODUCTS_KEY = 'agrieid_lp_products';
 
 const KG_TO_LB = 2.20462;
 
@@ -86,6 +89,9 @@ export class LivestockProSync extends EventTarget {
         localStorage.removeItem(LP_BATCHES_KEY);
         localStorage.removeItem(LP_RECORDS_KEY);
         localStorage.removeItem(LP_RECORD_HISTORY_KEY);
+        localStorage.removeItem(LP_BREEDS_KEY);
+        localStorage.removeItem(LP_BATCH_PRODUCTS_KEY);
+        localStorage.removeItem(LP_PRODUCTS_KEY);
         localStorage.removeItem('agrieid_sessions');
     }
 
@@ -491,6 +497,14 @@ export class LivestockProSync extends EventTarget {
         if (history.length) {
             localStorage.setItem(LP_RECORD_HISTORY_KEY, JSON.stringify(history));
         }
+        const breeds = data.breeds?.rows || [];
+        if (breeds.length) localStorage.setItem(LP_BREEDS_KEY, JSON.stringify(breeds));
+        const batchProducts = data.medical_batch_products?.rows || [];
+        if (batchProducts.length) localStorage.setItem(LP_BATCH_PRODUCTS_KEY, JSON.stringify(batchProducts));
+        const products = data.products?.rows || [];
+        if (products.length) localStorage.setItem(LP_PRODUCTS_KEY, JSON.stringify(products));
+        const batches = data.medical_batch?.rows || [];
+        if (batches.length) localStorage.setItem(LP_BATCHES_KEY, JSON.stringify(batches));
         return { animals: records.length, history: history.length };
     }
 
@@ -501,6 +515,26 @@ export class LivestockProSync extends EventTarget {
 
     getCloudRecordHistory() {
         try { return JSON.parse(localStorage.getItem(LP_RECORD_HISTORY_KEY) || '[]'); }
+        catch { return []; }
+    }
+
+    getCloudBreeds() {
+        try { return JSON.parse(localStorage.getItem(LP_BREEDS_KEY) || '[]'); }
+        catch { return []; }
+    }
+
+    getCloudMedicalBatches() {
+        try { return JSON.parse(localStorage.getItem(LP_BATCHES_KEY) || '[]'); }
+        catch { return []; }
+    }
+
+    getCloudBatchProducts() {
+        try { return JSON.parse(localStorage.getItem(LP_BATCH_PRODUCTS_KEY) || '[]'); }
+        catch { return []; }
+    }
+
+    getCloudProducts() {
+        try { return JSON.parse(localStorage.getItem(LP_PRODUCTS_KEY) || '[]'); }
         catch { return []; }
     }
 
