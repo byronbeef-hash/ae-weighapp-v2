@@ -1,14 +1,14 @@
 // AE WeighApp Service Worker — Offline-first caching
 // v2: Network-first for JS (always get latest code), cache-first for static assets
-const CACHE_NAME = 'ae-weighapp-v21';
+const CACHE_NAME = 'ae-weighapp-v23';
 const ASSETS = [
     '/',
     '/index.html',
-    '/styles.css?v=20',
-    '/js/app.js?v=20',
-    '/js/scales.js?v=20',
-    '/js/eid-reader.js?v=20',
-    '/js/livestockpro-sync.js?v=20',
+    '/styles.css?v=23',
+    '/js/app.js?v=23',
+    '/js/scales.js?v=23',
+    '/js/eid-reader.js?v=23',
+    '/js/livestockpro-sync.js?v=23',
     '/manifest.json',
     '/icons/icon.svg',
 ];

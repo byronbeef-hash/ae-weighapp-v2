@@ -11,7 +11,7 @@
     <link rel="manifest" href="manifest.json">
     <!-- iOS PWA -->
     <link rel="apple-touch-icon" href="icons/icon-192.png">
-    <link rel="stylesheet" href="styles.css?v=21">
+    <link rel="stylesheet" href="styles.css?v=23">
 </head>
 <body>
 <!-- Diagnostic status bar — visible immediately, updated by JS -->
@@ -698,7 +698,7 @@ window.addEventListener('unhandledrejection', function(e) {
 })();
 
 // ── 3. Nuclear cache clear — wipe ALL old service workers + caches ──
-var APP_VERSION = 'v21';
+var APP_VERSION = 'v23';
 (function() {
     // Auto-update the status bar with current version
     var statusEl = document.getElementById('app-status-text');
@@ -736,7 +736,7 @@ setTimeout(function() {
     }
 }, 4000);
 </script>
-<script type="module" src="js/app.js?v=21"></script>
+<script type="module" src="js/app.js?v=23"></script>
 <script>
 // ── 5. Service Worker registration ──
 if ('serviceWorker' in navigator) {

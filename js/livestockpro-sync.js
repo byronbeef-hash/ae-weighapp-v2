@@ -75,6 +75,14 @@ export class LivestockProSync extends EventTarget {
         this._refreshToken = null;
         this._user = null;
         localStorage.removeItem(LP_AUTH_KEY);
+        this._wipeSyncState();
+    }
+
+    _wipeSyncState() {
+        localStorage.removeItem(LP_LAST_SYNC_KEY);
+        localStorage.removeItem(LP_FARM_UUID_KEY);
+        localStorage.removeItem(LP_BATCHES_KEY);
+        localStorage.removeItem('agrieid_sessions');
     }
 
     isLoggedIn() {
@@ -96,6 +104,10 @@ export class LivestockProSync extends EventTarget {
     }
 
     async login(email, password) {
+        // Always wipe cached sync state before a fresh login so we don't
+        // leak sessions or a stale last_sync_date from any previous account.
+        this._wipeSyncState();
+
         const response = await this._fetch('login', {
             method: 'POST',
             body: {
