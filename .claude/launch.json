@@ -2,10 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "agrieid",
+      "name": "agrieid-v2",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["http-server", "-p", "8080", "-c-1"],
-      "port": 8080
+      "runtimeArgs": ["http-server", "-p", "8082", "-c-1", "/Users/timdickinson/Dropbox/Ai/AgriEID/agrieid-weighapp-v2"],
+      "port": 8082
     }
   ]
 }

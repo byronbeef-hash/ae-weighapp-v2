@@ -3456,6 +3456,47 @@ function buildAnimalIndex() {
         }
     }
 
+    // 4. LP full cattle register (all animals) — covers records not tied
+    //    to any scanner session. Skip soft-deleted rows.
+    try {
+        const cloudRecords = lpSync.getCloudRecords ? lpSync.getCloudRecords() : [];
+        for (const cr of cloudRecords) {
+            if (cr.deleted_at || cr.record_status !== 1 || !cr.eid) continue;
+            addRecord({
+                id: cr.uuid,
+                eid: cr.eid || '',
+                vid: cr.visual_tag || '',
+                weight: parseFloat(cr.weight_kg) || 0,
+                weightUnit: 'kg',
+                unit: 'kg',
+                notes: cr.notes || '',
+                date: (cr.record_date || cr.updated_at || '').split(' ')[0].split('T')[0],
+                timestamp: cr.updated_at || cr.created_at || new Date().toISOString(),
+                lpSynced: true,
+            }, 'Cloud Register');
+        }
+    } catch { /* skip */ }
+
+    // 5. LP record_history — per-animal weight events across all time
+    try {
+        const history = lpSync.getCloudRecordHistory ? lpSync.getCloudRecordHistory() : [];
+        for (const h of history) {
+            if (h.deleted_at || !h.eid) continue;
+            addRecord({
+                id: h.uuid,
+                eid: h.eid || '',
+                vid: h.visual_tag || '',
+                weight: parseFloat(h.weight_kg) || 0,
+                weightUnit: 'kg',
+                unit: 'kg',
+                notes: h.notes || '',
+                date: (h.record_date || h.created_at || '').split(' ')[0].split('T')[0],
+                timestamp: h.created_at || new Date().toISOString(),
+                lpSynced: true,
+            }, 'History');
+        }
+    } catch { /* skip */ }
+
     // Deduplicate records per animal and compute stats
     for (const [eid, animal] of animals) {
         // Deduplicate by record id
@@ -3504,7 +3545,8 @@ async function renderCloudDashboard() {
         try {
             const result = await lpSync.pullData();
             if (statusEl) {
-                statusEl.textContent = `Synced: ${result.newSessions} session(s), ${result.newRecords} record(s)`;
+                const regAnimals = result.registerAnimals || 0;
+                statusEl.textContent = `Synced: ${regAnimals} animal(s), ${result.newSessions} new session(s), ${result.newRecords} new record(s)`;
                 statusEl.style.color = 'var(--green)';
             }
         } catch (err) {

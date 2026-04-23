@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LivestockProSync client test</title>
+</head>
+<body>
+<h1>LivestockProSync — client test harness</h1>
+<pre id="log">Loading…</pre>
+<script type="module">
+import { LivestockProSync } from '../js/livestockpro-sync.js';
+
+const logEl = document.getElementById('log');
+const lines = [];
+const log = (s) => { lines.push(s); logEl.textContent = lines.join('\n'); console.log(s); };
+let pass = 0, fail = 0;
+const assert = (cond, label, extra = '') => {
+    if (cond) { log(`  PASS  ${label}`); pass++; }
+    else { log(`  FAIL  ${label}${extra ? ' — ' + extra : ''}`); fail++; }
+};
+const results = { pass: 0, fail: 0, done: false, error: null };
+window.__TEST_RESULTS = results;
+
+async function run() {
+    try {
+        // Clean slate
+        localStorage.clear();
+        log('── LivestockProSync client test ──\n');
+
+        // ── Scenario 1: fresh login → pull → data viewable ──
+        log('[1] Fresh login as aedemo, pull, verify sessions viewable');
+        const lp = new LivestockProSync();
+        const r1 = await lp.login('aedemo', 'demo@123');
+        assert(!!r1?.user, 'login returned user');
+        assert(lp.isLoggedIn(), 'isLoggedIn() true');
+        assert(!!lp.getFarmUuid(), 'farm uuid stored');
+
+        const pull1 = await lp.pullData();
+        log(`     pull stats: newSessions=${pull1.newSessions} newRecords=${pull1.newRecords}`);
+        assert(pull1.newSessions > 0, 'pullData returned sessions', `got ${pull1.newSessions}`);
+        assert(pull1.newRecords > 0, 'pullData returned records', `got ${pull1.newRecords}`);
+
+        const storedRaw = localStorage.getItem('agrieid_sessions');
+        const stored = storedRaw ? JSON.parse(storedRaw) : [];
+        assert(stored.length > 0, 'sessions persisted to localStorage', `got ${stored.length}`);
+        assert(stored.some(s => (s.records || []).length > 0), 'at least one session has records');
+        const totalRecords = stored.reduce((n, s) => n + (s.records?.length || 0), 0);
+        log(`     localStorage: ${stored.length} sessions, ${totalRecords} total records`);
+
+        const lastSyncAfter1 = localStorage.getItem('agrieid_lp_last_sync');
+        assert(!!lastSyncAfter1, 'last_sync_date stored after pull');
+
+        // ── Scenario 2: logout → login same user → wipe → pull still works ──
+        log('\n[2] Logout, re-login same user, verify wipe + re-pull works');
+        await lp.logout();
+        assert(!lp.isLoggedIn(), 'isLoggedIn() false after logout');
+        assert(!localStorage.getItem('agrieid_sessions'), 'sessions wiped on logout');
+        assert(!localStorage.getItem('agrieid_lp_last_sync'), 'last_sync wiped on logout');
+
+        const lp2 = new LivestockProSync();
+        await lp2.login('aedemo', 'demo@123');
+        const pull2 = await lp2.pullData();
+        assert(pull2.newSessions > 0, 're-login pull returns sessions');
+
+        // ── Scenario 3: simulate stale state from previous user, then login → wipe fires ──
+        log('\n[3] Simulate stale last_sync from a different account, re-login wipes it');
+        // Seed stale state as if a different user had pulled
+        localStorage.setItem('agrieid_lp_last_sync', new Date().toISOString());
+        localStorage.setItem('agrieid_sessions', JSON.stringify([{id:'ghost-from-other-user',records:[]}]));
+        assert(!!localStorage.getItem('agrieid_lp_last_sync'), 'stale last_sync seeded');
+
+        const lp3 = new LivestockProSync();
+        await lp3.login('aedemo', 'demo@123');
+        // After login() the wipe should have cleared stale state
+        const sessionsAfterLogin = JSON.parse(localStorage.getItem('agrieid_sessions') || '[]');
+        assert(!sessionsAfterLogin.some(s => s.id === 'ghost-from-other-user'),
+            'ghost session from other user wiped on login');
+        assert(!localStorage.getItem('agrieid_lp_last_sync'),
+            'stale last_sync wiped on login');
+
+        const pull3 = await lp3.pullData();
+        assert(pull3.newSessions > 0,
+            'pull after wipe returns sessions (no stale-date blocking)',
+            `got ${pull3.newSessions}`);
+        log(`     pull after wipe: ${pull3.newSessions} sessions, ${pull3.newRecords} records`);
+
+        // ── Scenario 4: full cattle register pulled and viewable ──
+        log('\n[4] Full cattle register is pulled and viewable');
+        const lp4 = new LivestockProSync();
+        await lp4.login('aedemo', 'demo@123');
+        const pull4 = await lp4.pullData();
+        log(`     pull: sessions=${pull4.newSessions} records=${pull4.newRecords} registerAnimals=${pull4.registerAnimals} registerHistory=${pull4.registerHistory}`);
+        assert(pull4.registerAnimals >= 30, 'registerAnimals pulled (expect ~36)', `got ${pull4.registerAnimals}`);
+        assert(pull4.registerHistory >= 100, 'registerHistory pulled (expect ~179)', `got ${pull4.registerHistory}`);
+
+        const regRecords = lp4.getCloudRecords();
+        const regHistory = lp4.getCloudRecordHistory();
+        assert(Array.isArray(regRecords) && regRecords.length >= 30, 'getCloudRecords() returns array of animals');
+        assert(Array.isArray(regHistory) && regHistory.length >= 100, 'getCloudRecordHistory() returns array');
+        assert(regRecords.every(r => r.eid && r.uuid), 'every animal has eid + uuid');
+        log(`     localStorage register: ${regRecords.length} animals, ${regHistory.length} history events`);
+
+        await lp4.logout();
+
+        log(`\n── Result: ${pass} passed, ${fail} failed ──`);
+        results.pass = pass;
+        results.fail = fail;
+        results.done = true;
+    } catch (err) {
+        log(`\nFATAL: ${err.message}\n${err.stack}`);
+        results.error = err.message;
+        results.fail = fail + 1;
+        results.done = true;
+    }
+}
+
+run();
+</script>
+</body>
+</html>

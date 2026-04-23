@@ -7,6 +7,8 @@ const LP_AUTH_KEY = 'agrieid_lp_auth';
 const LP_BATCHES_KEY = 'agrieid_medical_batches';
 const LP_LAST_SYNC_KEY = 'agrieid_lp_last_sync';
 const LP_FARM_UUID_KEY = 'agrieid_lp_farm_uuid';
+const LP_RECORDS_KEY = 'agrieid_lp_records';
+const LP_RECORD_HISTORY_KEY = 'agrieid_lp_record_history';
 
 const KG_TO_LB = 2.20462;
 
@@ -82,6 +84,8 @@ export class LivestockProSync extends EventTarget {
         localStorage.removeItem(LP_LAST_SYNC_KEY);
         localStorage.removeItem(LP_FARM_UUID_KEY);
         localStorage.removeItem(LP_BATCHES_KEY);
+        localStorage.removeItem(LP_RECORDS_KEY);
+        localStorage.removeItem(LP_RECORD_HISTORY_KEY);
         localStorage.removeItem('agrieid_sessions');
     }
 
@@ -447,11 +451,57 @@ export class LivestockProSync extends EventTarget {
             this.setFarmUuid(users[0].farm_uuid);
         }
 
+        // Pull full cattle register (all animals + full weight history,
+        // including records not tied to a scanner session).
+        try {
+            const regStats = await this._pullCattleRegister(endpoint);
+            stats.registerAnimals = regStats.animals;
+            stats.registerHistory = regStats.history;
+        } catch (err) {
+            console.warn('[LP] Cattle register pull failed:', err.message);
+            stats.registerAnimals = 0;
+            stats.registerHistory = 0;
+        }
+
         // Update last sync date
         localStorage.setItem(LP_LAST_SYNC_KEY, new Date().toISOString());
 
         this._emit('pullComplete', stats);
         return stats;
+    }
+
+    // Pulls the full cattle register (all animals, all history) — separate
+    // from the session-centric pull because LP returns different shapes
+    // depending on `is_session`. With `is_session` omitted we get the full
+    // `record` and `record_history` tables.
+    async _pullCattleRegister(endpoint) {
+        const body = {
+            device_id: this._getDeviceId(),
+            device_type: 'web',
+            app_version: this._getAppVersion(),
+            source_app: 'agrieid_weigh',
+        };
+        const result = await this._fetch(endpoint, { method: 'POST', body });
+        const data = result.response_data || {};
+        const records = data.record?.rows || [];
+        const history = data.record_history?.rows || [];
+        if (records.length) {
+            localStorage.setItem(LP_RECORDS_KEY, JSON.stringify(records));
+        }
+        if (history.length) {
+            localStorage.setItem(LP_RECORD_HISTORY_KEY, JSON.stringify(history));
+        }
+        return { animals: records.length, history: history.length };
+    }
+
+    getCloudRecords() {
+        try { return JSON.parse(localStorage.getItem(LP_RECORDS_KEY) || '[]'); }
+        catch { return []; }
+    }
+
+    getCloudRecordHistory() {
+        try { return JSON.parse(localStorage.getItem(LP_RECORD_HISTORY_KEY) || '[]'); }
+        catch { return []; }
     }
 
     // ── Medical Batches ──────────────────────────────────────
